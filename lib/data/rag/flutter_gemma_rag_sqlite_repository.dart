@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:flutter_gemma/flutter_gemma.dart';
 
+import '../../domain/rag/knowledge_document.dart';
 import '../../domain/rag/rag_document.dart';
 import '../../domain/rag/rag_repository.dart';
 import '../../domain/rag/rag_search_result.dart';
 
 class FlutterGemmaRagSqliteRepository implements RagRepository {
+  static const _documentMetadataKey = '_knowledgeDocument';
+
   FlutterGemmaRagSqliteRepository({
     required Future<String> Function() databasePathProvider,
     Future<void> Function()? prepareEmbeddingModel,
@@ -36,11 +39,15 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     await _prepareEmbeddingModel?.call();
     for (final document in documents) {
       await _runtime.addDocument(
-        id: document.id,
-        content: document.content,
-        metadata: document.metadata == null
-            ? null
-            : jsonEncode(document.metadata),
+        id: document.document.id,
+        content: document.searchableText,
+        metadata: jsonEncode({
+          _documentMetadataKey: {
+            'title': document.document.title,
+            'content': document.document.content,
+            'metadata': document.document.metadata,
+          },
+        }),
       );
     }
   }
@@ -61,17 +68,47 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     return results
         .map(
           (result) => RagSearchResult(
-            id: result.id,
-            content: result.content,
+            document: _documentFromResult(result),
             similarity: result.similarity,
-            metadata: result.metadata == null
-                ? null
-                : Map<String, String>.from(
-                    jsonDecode(result.metadata!) as Map<String, dynamic>,
-                  ),
           ),
         )
         .toList(growable: false);
+  }
+
+  KnowledgeDocument _documentFromResult(FlutterGemmaRagRuntimeResult result) {
+    final storedMetadata = result.metadata == null
+        ? const <String, dynamic>{}
+        : _decodeMetadata(result.metadata!);
+    final storedDocument = storedMetadata[_documentMetadataKey];
+    if (storedDocument is Map) {
+      final document = Map<String, dynamic>.from(storedDocument);
+      final title = document['title'];
+      final content = document['content'];
+      final metadata = document['metadata'];
+      if (title is String && content is String && metadata is Map) {
+        return KnowledgeDocument(
+          id: result.id,
+          title: title,
+          content: content,
+          metadata: Map<String, dynamic>.from(metadata),
+        );
+      }
+    }
+
+    return KnowledgeDocument(
+      id: result.id,
+      title: result.id,
+      content: result.content,
+      metadata: storedMetadata,
+    );
+  }
+
+  Map<String, dynamic> _decodeMetadata(String metadata) {
+    final decoded = jsonDecode(metadata);
+    if (decoded is! Map) {
+      throw const FormatException('Stored RAG metadata must be a JSON object.');
+    }
+    return Map<String, dynamic>.from(decoded);
   }
 }
 

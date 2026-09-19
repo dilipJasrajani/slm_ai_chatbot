@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "id": "error-e123",
+      "title": "Device cannot connect to network",
+      "content": "The device is unable to establish a network connection.\n\nPossible causes:\n- Wi-Fi is unavailable\n- Network credentials are incorrect\n- The device is outside the network range\n\nResolution:\n- Check that Wi-Fi is enabled\n- Verify the network credentials\n- Move the device closer to the network\n- Retry the connection\n\nRelated documents:\n- E456",
+      "metadata": {
+        "type": "error",
+        "code": "E123"
+      }
+    },
+    {
+      "id": "error-e456",
+      "title": "Authentication failed",
+      "content": "The device could not authenticate with the configured service.\n\nPossible causes:\n- Invalid credentials\n- Expired authentication session\n\nResolution:\n- Verify the credentials\n- Sign in again\n- Retry the operation\n\nRelated documents:\n- E123",
+      "metadata": {
+        "type": "error",
+        "code": "E456"
+      }
+    },
+    {
+      "id": "error-e789",
+      "title": "Device communication timeout",
+      "content": "The device did not respond within the expected time.\n\nPossible causes:\n- Device is offline\n- Network latency\n- Temporary communication failure\n\nResolution:\n- Check device connectivity\n- Retry the operation\n- Restart the device if necessary\n\nRelated documents:\n- E123",
+      "metadata": {
+        "type": "error",
+        "code": "E789"
+      }
+    }
+  ]
+}

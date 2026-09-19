@@ -2,6 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/domain/llm/local_llm_service.dart';
 import 'package:slm_ai_chatbot/domain/model/local_model_manager.dart';
 import 'package:slm_ai_chatbot/domain/model/local_model_repository.dart';
+import 'package:slm_ai_chatbot/domain/rag/ask_question_use_case.dart';
+import 'package:slm_ai_chatbot/domain/rag/document_source.dart';
+import 'package:slm_ai_chatbot/domain/rag/ingest_documents_use_case.dart';
+import 'package:slm_ai_chatbot/domain/rag/knowledge_document.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_document.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_repository.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_search_result.dart';
@@ -20,9 +24,7 @@ void main() {
       MyApp(
         modelManager: modelManager,
         llmService: llmService,
-        ragProofOfConcept: TechnicalSupportRagProofOfConcept(
-          _FakeRagRepository(),
-        ),
+        ragProofOfConcept: _proofOfConcept(),
       ),
     );
     await tester.tap(find.text('Generate Test Response'));
@@ -46,9 +48,7 @@ void main() {
       MyApp(
         modelManager: modelManager,
         llmService: llmService,
-        ragProofOfConcept: TechnicalSupportRagProofOfConcept(
-          _FakeRagRepository(),
-        ),
+        ragProofOfConcept: _proofOfConcept(),
       ),
     );
     await tester.tap(find.text('Generate Test Response'));
@@ -71,18 +71,36 @@ void main() {
         llmService: _FakeLocalLlmService(
           response: const Stream<String>.empty(),
         ),
-        ragProofOfConcept: TechnicalSupportRagProofOfConcept(
-          _FakeRagRepository(),
-        ),
+        ragProofOfConcept: _proofOfConcept(),
       ),
     );
-    await tester.tap(find.text('Run Local RAG Proof of Concept'));
+    await tester.tap(find.text('Run Local RAG Question Answering'));
     await tester.pump();
 
-    expect(find.textContaining('Retrieved error-e123'), findsOneWidget);
+    expect(
+      find.textContaining('Device cannot connect to network'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Check that Wi-Fi is enabled.'), findsOneWidget);
 
     await modelManager.dispose();
   });
+}
+
+TechnicalSupportRagProofOfConcept _proofOfConcept() {
+  final ragRepository = _FakeRagRepository();
+  return TechnicalSupportRagProofOfConcept(
+    ingestDocuments: IngestDocumentsUseCase(
+      documentSource: const _FakeDocumentSource(),
+      ragRepository: ragRepository,
+    ),
+    askQuestion: AskQuestionUseCase(
+      ragRepository: ragRepository,
+      llmService: _FakeLocalLlmService(
+        response: Stream<String>.value('Check that Wi-Fi is enabled.'),
+      ),
+    ),
+  );
 }
 
 class _ReadyModelRepository implements LocalModelRepository {
@@ -132,9 +150,29 @@ class _FakeRagRepository implements RagRepository {
   }) async {
     return const [
       RagSearchResult(
-        id: 'error-e123',
-        content: 'The device failed to establish a network connection.',
+        document: KnowledgeDocument(
+          id: 'error-e123',
+          title: 'Device cannot connect to network',
+          content: 'The device failed to establish a network connection.',
+          metadata: {'type': 'error', 'code': 'E123'},
+        ),
         similarity: 1.0,
+      ),
+    ];
+  }
+}
+
+class _FakeDocumentSource implements DocumentSource {
+  const _FakeDocumentSource();
+
+  @override
+  Future<List<KnowledgeDocument>> loadDocuments() async {
+    return const [
+      KnowledgeDocument(
+        id: 'error-e123',
+        title: 'Device cannot connect to network',
+        content: 'The device failed to establish a network connection.',
+        metadata: {'type': 'error', 'code': 'E123'},
       ),
     ];
   }

@@ -1,49 +1,24 @@
-import 'rag_document.dart';
-import 'rag_repository.dart';
-import 'rag_search_result.dart';
+import 'ask_question_use_case.dart';
+import 'ingest_documents_use_case.dart';
 
 class TechnicalSupportRagProofOfConcept {
-  TechnicalSupportRagProofOfConcept(this._repository);
+  TechnicalSupportRagProofOfConcept({
+    required IngestDocumentsUseCase ingestDocuments,
+    required AskQuestionUseCase askQuestion,
+  }) : _ingestDocuments = ingestDocuments,
+       _askQuestion = askQuestion;
 
-  final RagRepository _repository;
+  final IngestDocumentsUseCase _ingestDocuments;
+  final AskQuestionUseCase _askQuestion;
 
-  // static const query = 'The device cannot connect to the network.';
-  static const query = 'Seems some sendor is not working.';
+  static const question =
+      'What is galaxy?';
+      // 'My device cannot connect to Wi-Fi. What should I check?';
 
-  static const documents = [
-    RagDocument(
-      id: 'error-e123',
-      content:
-          'Error E123:\n'
-          'The device failed to establish a network connection.\n'
-          'Possible cause: Network connectivity is unavailable.\n'
-          'Resolution: Check the network connection and retry.',
-      metadata: {'errorCode': 'E123'},
-    ),
-    RagDocument(
-      id: 'error-e456',
-      content:
-          'Error E456:\n'
-          'The device temperature sensor is not responding.\n'
-          'Possible cause: The sensor cable is disconnected.\n'
-          'Resolution: Inspect and reconnect the sensor cable.',
-      metadata: {'errorCode': 'E456'},
-    ),
-    RagDocument(
-      id: 'error-e789',
-      content:
-          'Error E789:\n'
-          'The device cannot complete a firmware update.\n'
-          'Possible cause: The update package is corrupted.\n'
-          'Resolution: Download the update package again and restart the update.',
-      metadata: {'errorCode': 'E789'},
-    ),
-  ];
-
-  Future<RagSearchResult?> run() async {
-    await _repository.initialize();
-    await _repository.indexDocuments(documents);
-    final results = await _repository.search(query: query);
-    return results.isEmpty ? null : results.first;
+  Future<QuestionAnswer> run({
+    void Function(DocumentIngestionProgress progress)? onProgress,
+  }) async {
+    await _ingestDocuments(onProgress: onProgress);
+    return _askQuestion(question);
   }
 }

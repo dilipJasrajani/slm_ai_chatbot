@@ -26,6 +26,12 @@ void main() {
         content: 'The firmware update package is corrupted.',
         embedding: [0.0, 0.0, 1.0],
       );
+      await store.addDocument(
+        id: 'error-e123',
+        content: 'Updated network connection guidance.',
+        embedding: [1.0, 0.0, 0.0],
+      );
+      expect((await store.getStats()).documentCount, 3);
       await store.close();
 
       final reopenedStore = SqliteVectorStore();

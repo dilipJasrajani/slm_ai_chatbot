@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../domain/llm/local_llm_service.dart';
 import '../domain/model/local_model_manager.dart';
 import '../domain/model/model_status.dart';
+import '../domain/rag/ingest_documents_use_case.dart';
+import '../domain/rag/knowledge_document.dart';
 import '../domain/rag/technical_support_rag_proof_of_concept.dart';
 
 class LocalInferenceScreen extends StatefulWidget {
@@ -33,6 +35,9 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
   var _response = '';
   String? _generationError;
   String? _ragStatus;
+  String? _ragQuestion;
+  List<KnowledgeDocument> _retrievedDocuments = const [];
+  String? _ragAnswer;
 
   @override
   void initState() {
@@ -101,23 +106,43 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
     });
 
     try {
-      final result = await widget.ragProofOfConcept.run();
+      final result = await widget.ragProofOfConcept.run(
+        onProgress: _showIngestionProgress,
+      );
       if (mounted) {
         setState(() {
-          _ragStatus = result == null
-              ? 'No relevant document was found.'
-              : 'Retrieved ${result.id}:\n${result.content}';
+          _ragQuestion = TechnicalSupportRagProofOfConcept.question;
+          _retrievedDocuments = result.documents;
+          _ragAnswer = result.answer;
+          _ragStatus = null;
         });
       }
     } catch (error) {
       if (mounted) {
-        setState(() => _ragStatus = 'Local RAG error: $error');
+        setState(
+          () => _ragStatus = 'Unable to prepare local knowledge documents.',
+        );
       }
     } finally {
       if (mounted) {
         setState(() => _isRunningRag = false);
       }
     }
+  }
+
+  void _showIngestionProgress(DocumentIngestionProgress progress) {
+    if (!mounted) return;
+
+    final status = switch (progress.stage) {
+      DocumentIngestionStage.loading => 'Loading documents...',
+      DocumentIngestionStage.loaded =>
+        'Loaded ${progress.documentCount} documents.',
+      DocumentIngestionStage.indexing =>
+        'Indexing ${progress.documentCount} documents...',
+      DocumentIngestionStage.ready =>
+        'Documents ready: ${progress.documentCount} documents indexed.',
+    };
+    setState(() => _ragStatus = status);
   }
 
   @override
@@ -131,7 +156,7 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Local Gemma Test')),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -166,10 +191,26 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
                 onPressed: _isRunningRag ? null : _runRagProofOfConcept,
                 child: Text(
                   _isRunningRag
-                      ? 'Indexing Local RAG Documents...'
-                      : 'Run Local RAG Proof of Concept',
+                      ? 'Preparing Local RAG Answer...'
+                      : 'Run Local RAG Question Answering',
                 ),
               ),
+              if (_ragQuestion != null) ...[
+                const SizedBox(height: 16),
+                const Text('Question:'),
+                Text(_ragQuestion!),
+                const SizedBox(height: 8),
+                const Text('Retrieved documents:'),
+                if (_retrievedDocuments.isEmpty)
+                  const Text('No relevant documents found.')
+                else
+                  ..._retrievedDocuments.map(
+                    (document) => Text('${document.title} (${document.id})'),
+                  ),
+                const SizedBox(height: 8),
+                const Text('Answer:'),
+                Text(_ragAnswer ?? ''),
+              ],
               if (_ragStatus != null) ...[
                 const SizedBox(height: 8),
                 Text(_ragStatus!),
@@ -177,11 +218,7 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
               const SizedBox(height: 24),
               const Text('Response:'),
               const SizedBox(height: 8),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Text(_generationError ?? modelError ?? _response),
-                ),
-              ),
+              Text(_generationError ?? modelError ?? _response),
             ],
           ),
         ),

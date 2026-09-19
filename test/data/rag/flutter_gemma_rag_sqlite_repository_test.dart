@@ -1,39 +1,45 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/data/rag/flutter_gemma_rag_sqlite_repository.dart';
+import 'package:slm_ai_chatbot/domain/rag/knowledge_document.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_document.dart';
 
 void main() {
-  test(
-    'initializes once, indexes documents, and maps search results',
-    () async {
-      final runtime = _FakeRagRuntime();
-      var embeddingPrepared = 0;
-      final repository = FlutterGemmaRagSqliteRepository(
-        databasePathProvider: () async => '/local/rag.db',
-        prepareEmbeddingModel: () async => embeddingPrepared += 1,
-        runtime: runtime,
-      );
+  test('initializes once, indexes documents, and maps search results', () async {
+    final runtime = _FakeRagRuntime();
+    var embeddingPrepared = 0;
+    final repository = FlutterGemmaRagSqliteRepository(
+      databasePathProvider: () async => '/local/rag.db',
+      prepareEmbeddingModel: () async => embeddingPrepared += 1,
+      runtime: runtime,
+    );
 
-      await repository.indexDocuments([
-        const RagDocument(
+    await repository.indexDocuments([
+      const RagDocument(
+        document: KnowledgeDocument(
           id: 'error-e123',
+          title: 'Device cannot connect to network',
           content: 'The device failed to establish a network connection.',
-          metadata: {'errorCode': 'E123'},
+          metadata: {'type': 'error', 'code': 'E123'},
         ),
-      ]);
-      final results = await repository.search(
-        query: 'The device cannot connect to the network.',
-      );
+        searchableText: 'Device cannot connect to network',
+      ),
+    ]);
+    final results = await repository.search(
+      query: 'The device cannot connect to the network.',
+    );
 
-      expect(runtime.databasePaths, ['/local/rag.db']);
-      expect(embeddingPrepared, 2);
-      expect(runtime.indexedDocuments.single.id, 'error-e123');
-      expect(runtime.indexedDocuments.single.metadata, '{"errorCode":"E123"}');
-      expect(runtime.query, 'The device cannot connect to the network.');
-      expect(results.single.id, 'error-e123');
-      expect(results.single.metadata, {'errorCode': 'E123'});
-    },
-  );
+    expect(runtime.databasePaths, ['/local/rag.db']);
+    expect(embeddingPrepared, 2);
+    expect(runtime.indexedDocuments.single.id, 'error-e123');
+    expect(
+      runtime.indexedDocuments.single.metadata,
+      '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","metadata":{"type":"error","code":"E123"}}}',
+    );
+    expect(runtime.query, 'The device cannot connect to the network.');
+    expect(results.single.document.id, 'error-e123');
+    expect(results.single.document.title, 'Device cannot connect to network');
+    expect(results.single.document.metadata, {'type': 'error', 'code': 'E123'});
+  });
 }
 
 class _FakeRagRuntime extends FlutterGemmaRagRuntime {
@@ -67,9 +73,10 @@ class _FakeRagRuntime extends FlutterGemmaRagRuntime {
     return const [
       FlutterGemmaRagRuntimeResult(
         id: 'error-e123',
-        content: 'The device failed to establish a network connection.',
+        content: 'Device cannot connect to network',
         similarity: 0.98,
-        metadata: '{"errorCode":"E123"}',
+        metadata:
+            '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","metadata":{"type":"error","code":"E123"}}}',
       ),
     ];
   }

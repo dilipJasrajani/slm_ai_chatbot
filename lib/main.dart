@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_gemma_embeddings/flutter_gemma_embeddings.dart';
 import 'package:flutter_gemma_mediapipe/flutter_gemma_mediapipe.dart';
@@ -11,8 +12,11 @@ import 'data/llm/flutter_gemma_local_llm_service.dart';
 import 'data/llm/flutter_gemma_local_model_repository.dart';
 import 'data/rag/flutter_gemma_embedding_model_initializer.dart';
 import 'data/rag/flutter_gemma_rag_sqlite_repository.dart';
+import 'data/rag/json_document_source.dart';
 import 'domain/llm/local_llm_service.dart';
 import 'domain/model/local_model_manager.dart';
+import 'domain/rag/ask_question_use_case.dart';
+import 'domain/rag/ingest_documents_use_case.dart';
 import 'domain/rag/technical_support_rag_proof_of_concept.dart';
 import 'presentation/local_inference_screen.dart';
 
@@ -36,15 +40,23 @@ Future<void> main() async {
     modelProvider: () async => modelRepository.loadedModel,
     releaseModel: modelRepository.releaseLoadedModel,
   );
+  final ragRepository = FlutterGemmaRagSqliteRepository(
+    prepareEmbeddingModel: FlutterGemmaEmbeddingModelInitializer(
+      downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
+    ).ensureReady,
+    databasePathProvider: () async {
+      final directory = await getApplicationSupportDirectory();
+      return '${directory.path}/technical_support_rag.db';
+    },
+  );
   _ragProofOfConcept = TechnicalSupportRagProofOfConcept(
-    FlutterGemmaRagSqliteRepository(
-      prepareEmbeddingModel: FlutterGemmaEmbeddingModelInitializer(
-        downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
-      ).ensureReady,
-      databasePathProvider: () async {
-        final directory = await getApplicationSupportDirectory();
-        return '${directory.path}/technical_support_rag.db';
-      },
+    ingestDocuments: IngestDocumentsUseCase(
+      documentSource: JsonDocumentSource(assetBundle: rootBundle),
+      ragRepository: ragRepository,
+    ),
+    askQuestion: AskQuestionUseCase(
+      ragRepository: ragRepository,
+      llmService: _llmService,
     ),
   );
   unawaited(_modelManager.ensureReady());
