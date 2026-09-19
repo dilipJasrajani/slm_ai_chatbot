@@ -1,16 +1,18 @@
-# slm_ai_chatbot
+# SLM AI Chatbot
 
-A new Flutter project.
+This Android and iOS Flutter app runs Gemma and RAG retrieval entirely on the
+device.
 
-## Getting Started
+## Local RAG proof of concept
 
-This project is a starting point for a Flutter application.
+The **Run Local RAG Proof of Concept** button indexes three technical-support
+documents and retrieves the best match for `The device cannot connect to the
+network.`. Vectors are stored in the app-support directory as
+`technical_support_rag.db`.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+On its first use, the app downloads the 256-token EmbeddingGemma 300M LiteRT
+model and SentencePiece tokenizer from `litert-community`. This is a one-time
+model installation; embedding generation, SQLite storage, and similarity
+retrieval are all local thereafter. Supply `HUGGING_FACE_TOKEN` with
+`--dart-define` only if the model host requires authentication. Model files are
+not committed to this repository.
