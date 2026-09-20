@@ -1,6 +1,7 @@
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_context_builder.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_message.dart';
 
+/// Combines question, grounded context, and supported history into the prompt.
 class RagPromptBuilder {
   const RagPromptBuilder({
     ConversationContextBuilder contextBuilder =

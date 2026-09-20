@@ -21,6 +21,7 @@ class DocumentIngestionResult {
   final int documentCount;
 }
 
+/// Loads source documents, creates searchable text, and indexes them for RAG.
 class IngestDocumentsUseCase {
   IngestDocumentsUseCase({
     required DocumentSource documentSource,

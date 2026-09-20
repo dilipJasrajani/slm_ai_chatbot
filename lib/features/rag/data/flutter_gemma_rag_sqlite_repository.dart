@@ -7,6 +7,7 @@ import '../domain/rag_document.dart';
 import '../domain/rag_repository.dart';
 import '../domain/rag_search_result.dart';
 
+/// Uses EmbeddingGemma and the Flutter Gemma SQLite vector store for RAG.
 class FlutterGemmaRagSqliteRepository implements RagRepository {
   static const _documentMetadataKey = '_knowledgeDocument';
 
@@ -112,6 +113,7 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
   }
 }
 
+/// Thin adapter around Flutter Gemma's vector-store API.
 class FlutterGemmaRagRuntime {
   Future<void> initializeVectorStore(String databasePath) {
     return FlutterGemmaPlugin.instance.initializeVectorStore(databasePath);

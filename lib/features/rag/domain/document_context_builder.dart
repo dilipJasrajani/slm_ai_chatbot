@@ -1,5 +1,6 @@
 import 'knowledge_document.dart';
 
+/// Formats grounded documents as the context supplied to the RAG prompt.
 class DocumentContextBuilder {
   const DocumentContextBuilder();
 

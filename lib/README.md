@@ -90,6 +90,74 @@ status. `LocalModelRepositoryImpl` performs the current local Qwen3 install
 and active-model loading. The composition root shares that loaded model with
 the local LLM service without making chat or RAG code depend on the model SDK.
 
+## Local RAG
+
+### Knowledge ingestion
+
+```text
+documents.json
+    ↓
+JsonDocumentSource
+    ↓
+KnowledgeDocument
+    ↓
+IngestDocumentsUseCase
+    ↓
+EmbeddingGemma
+    ↓
+SQLite vector storage
+```
+
+`JsonDocumentSource` loads the asset into generic `KnowledgeDocument` values.
+`IngestDocumentsUseCase` creates stable searchable text for each document and
+passes it to `RagRepository`. The Flutter Gemma repository uses
+EmbeddingGemma to create vectors and persists them in its local SQLite vector
+store, alongside metadata needed to reconstruct the original document.
+
+### Question retrieval
+
+```text
+User question + conversation context
+    ↓
+RetrievalQueryBuilder
+    ↓
+EmbeddingGemma
+    ↓
+vector search
+    ↓
+RagSearchResult
+    ↓
+RetrievedKnowledgeRelevance
+    ↓
+DocumentContextBuilder
+```
+
+`RetrievalQueryBuilder` includes the current question and existing
+conversation context in the search query. The repository delegates query
+embedding and vector search to the active EmbeddingGemma/vector-store runtime,
+then returns `RagSearchResult` values. `RetrievedKnowledgeRelevance` applies
+the existing grounding rules before `DocumentContextBuilder` formats documents
+that are safe to use.
+
+### Answer generation
+
+```text
+Context + question + supported history
+    ↓
+RagPromptBuilder
+    ↓
+LocalLlmService
+    ↓
+Qwen3
+    ↓
+answer
+```
+
+`RagPromptBuilder` owns the unchanged grounded-answer prompt. The Chat
+orchestrator sends that prompt through the generic `LocalLlmService`; Qwen3
+generates the answer. EmbeddingGemma is used only for ingestion and retrieval,
+not answer generation.
+
 ## Folder responsibilities
 
 `features/chat` contains conversation behavior, CHAT/KNOWLEDGE routing,
@@ -100,7 +168,8 @@ Qwen3 generation implementation, including Qwen3 output-channel parsing.
 
 `features/rag` contains knowledge documents, document ingestion, local
 embeddings, SQLite vector retrieval, grounding, RAG prompts, and retrieval
-evaluation. Its `support/` folder contains the inactive proof-of-concept
+evaluation. Its `evaluation/` folder is non-runtime retrieval tooling, and its
+`support/` folder contains the inactive proof-of-concept
 screen and helper kept for reference.
 
 `features/model` contains Qwen3 model downloading, installation, lifecycle

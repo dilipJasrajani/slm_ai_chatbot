@@ -1,5 +1,6 @@
 import 'package:flutter_gemma/flutter_gemma.dart';
 
+/// Ensures the local EmbeddingGemma model is installed and active for RAG.
 class FlutterGemmaEmbeddingModelInitializer {
   FlutterGemmaEmbeddingModelInitializer({String? downloadToken})
     : _downloadToken = downloadToken?.trim().isEmpty ?? true

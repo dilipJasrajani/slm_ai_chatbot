@@ -1,5 +1,6 @@
 import 'knowledge_document.dart';
 
+/// Produces the stable text embedded and indexed for one knowledge document.
 class DocumentSearchableText {
   const DocumentSearchableText();
 

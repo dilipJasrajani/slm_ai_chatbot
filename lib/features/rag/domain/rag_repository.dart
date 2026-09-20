@@ -1,6 +1,7 @@
 import 'rag_document.dart';
 import 'rag_search_result.dart';
 
+/// Indexes searchable documents and returns vector-search matches.
 abstract class RagRepository {
   Future<void> initialize();
 

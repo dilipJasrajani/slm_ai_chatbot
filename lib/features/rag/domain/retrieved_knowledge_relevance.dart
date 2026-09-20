@@ -1,6 +1,7 @@
 import 'knowledge_document.dart';
 import 'rag_search_result.dart';
 
+/// Applies the existing lexical and identifier grounding rules to search hits.
 class RetrievedKnowledgeRelevance {
   const RetrievedKnowledgeRelevance();
 

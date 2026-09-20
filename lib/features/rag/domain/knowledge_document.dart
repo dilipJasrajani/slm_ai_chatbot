@@ -1,3 +1,4 @@
+/// Source knowledge retained with its stable identity and descriptive fields.
 class KnowledgeDocument {
   const KnowledgeDocument({
     required this.id,

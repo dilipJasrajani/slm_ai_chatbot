@@ -54,6 +54,8 @@ Future<AppDependencies> createAppDependencies() async {
     modelProvider: () async => modelRepository.loadedModel,
     releaseModel: modelRepository.releaseLoadedModel,
   );
+
+  // RAG owns EmbeddingGemma preparation and SQLite vector-store access.
   final ragRepository = FlutterGemmaRagSqliteRepository(
     prepareEmbeddingModel: FlutterGemmaEmbeddingModelInitializer(
       downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
