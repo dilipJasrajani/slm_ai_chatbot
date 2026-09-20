@@ -7,6 +7,7 @@ import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 import 'chat_models.dart';
 
+/// Converts chat UI events and use-case streams into immutable presentation state.
 class ChatController extends ChangeNotifier {
   ChatController({
     required LocalModelManager modelManager,

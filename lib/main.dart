@@ -9,6 +9,8 @@ import 'app/app_dependencies.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // The local AI runtime must be ready before dependency composition.
   await FlutterGemma.initialize(
     inferenceEngines: [LiteRtLmEngine()],
     embeddingBackends: const [LiteRtEmbeddingBackend()],

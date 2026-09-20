@@ -11,7 +11,7 @@ import 'package:slm_ai_chatbot/features/chat/domain/deterministic_chat_intent_ro
 import 'package:slm_ai_chatbot/features/chat/evaluation/data/json_chat_intent_evaluation_dataset_source.dart';
 import 'package:slm_ai_chatbot/features/chat/evaluation/domain/chat_intent_evaluation_runner.dart';
 import 'package:slm_ai_chatbot/features/chat/evaluation/domain/evaluate_chat_intent_routing_use_case.dart';
-import 'package:slm_ai_chatbot/features/chat/presentation/chat_models.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/llm/data/local_llm_service_impl.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/data/local_model_repository_impl.dart';
@@ -24,6 +24,7 @@ import 'package:slm_ai_chatbot/features/rag/evaluation/data/json_retrieval_evalu
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/evaluate_retrieval_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/retrieval_evaluation_runner.dart';
 
+/// Shared runtime dependencies assembled by the application's composition root.
 class AppDependencies {
   const AppDependencies({
     required this.modelManager,
@@ -42,6 +43,7 @@ class AppDependencies {
   final Future<void> Function() prepareKnowledgeBase;
 }
 
+/// Wires domain abstractions to local implementations before the app starts.
 Future<AppDependencies> createAppDependencies() async {
   final modelRepository = LocalModelRepositoryImpl(
     downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),

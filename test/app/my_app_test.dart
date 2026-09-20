@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/app/app.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
-import 'package:slm_ai_chatbot/features/chat/presentation/chat_models.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';

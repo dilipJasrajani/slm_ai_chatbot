@@ -158,6 +158,40 @@ orchestrator sends that prompt through the generic `LocalLlmService`; Qwen3
 generates the answer. EmbeddingGemma is used only for ingestion and retrieval,
 not answer generation.
 
+## Presentation and application composition
+
+```text
+main.dart
+    ↓
+MyApp
+    ↓
+AiChatPage
+    ↓
+ChatController
+    ↓
+AskQuestionUseCase
+    ↓
+LLM / RAG
+```
+
+`main.dart` is the startup entry point: it initializes Flutter and the local AI
+runtime, creates application dependencies, then calls `runApp`. `app/app.dart`
+is the application shell, and `app/app_dependencies.dart` is the composition
+root that wires shared runtime instances and interfaces to implementations.
+
+Change chat UI, interaction, scrolling, animations, and message rendering in
+`features/chat/presentation/ai_chat_page.dart`. `ChatController` in the same
+folder owns presentation state and turns UI events and use-case streams into
+`ChatState` updates. `AskQuestionUseCase` remains responsible for chat request
+orchestration.
+
+Change white-label chat text, source-display behavior, history limit, and UI
+settings in `features/chat/presentation/ai_chat_configuration.dart`.
+`AiChatTheme` contains visual customization such as colors, spacing, bubbles,
+and avatar styling; `AiChatConfiguration` contains chat text and behavior
+configuration. `chat_models.dart` contains only transient `ChatMessage` and
+`ChatState` presentation models.
+
 ## Folder responsibilities
 
 `features/chat` contains conversation behavior, CHAT/KNOWLEDGE routing,
