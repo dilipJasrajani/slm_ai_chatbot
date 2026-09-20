@@ -32,9 +32,8 @@ class LocalLlmServiceImpl implements LocalLlmService {
 
     try {
       await session.addQueryChunk(Message(text: prompt, isUser: true));
-      yield* Qwen3OutputChannelParser().parse(
-        _logRawOutput(session.getResponseAsync()),
-      );
+      final rawOutput = _logRawOutput(session.getResponseAsync());
+      yield* Qwen3OutputChannelParser().parse(rawOutput);
     } finally {
       if (identical(_activeSession, session)) {
         _activeSession = null;

@@ -47,6 +47,8 @@ Future<AppDependencies> createAppDependencies() async {
     downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
   );
   const chatConfiguration = AiChatConfiguration();
+
+  // Lifecycle status and inference share one loaded local model.
   final modelManager = LocalModelManager(modelRepository);
   final LocalLlmService llmService = LocalLlmServiceImpl(
     modelProvider: () async => modelRepository.loadedModel,

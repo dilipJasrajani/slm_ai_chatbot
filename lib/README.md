@@ -43,6 +43,53 @@ feature dependencies, and starts the Flutter app.
 8. Each streamed answer is returned to `ChatController`, which updates the
    assistant message displayed by `AiChatPage`.
 
+## Local AI and model lifecycle
+
+### LLM generation
+
+```text
+Chat / RAG
+    ↓
+LocalLlmService
+    ↓
+LocalLlmServiceImpl
+    ↓
+flutter_gemma / Qwen3
+```
+
+Chat and RAG depend on the generic `LocalLlmService`. Its local implementation
+creates an inference session, submits the prompt, and streams generated output
+from the active local model.
+
+### Output processing
+
+```text
+Qwen3 output
+    ↓
+Qwen3OutputChannelParser
+    ↓
+clean assistant text
+```
+
+`LocalLlmServiceImpl` sends every raw streamed chunk through
+`Qwen3OutputChannelParser`. The parser contains the Qwen3-specific channel
+protocol handling; callers receive only the resulting assistant text.
+
+### Model lifecycle
+
+```text
+LocalModelManager
+    ↓
+LocalModelRepository
+    ↓
+LocalModelRepositoryImpl
+```
+
+`LocalModelManager` coordinates download, loading, readiness, and error
+status. `LocalModelRepositoryImpl` performs the current local Qwen3 install
+and active-model loading. The composition root shares that loaded model with
+the local LLM service without making chat or RAG code depend on the model SDK.
+
 ## Folder responsibilities
 
 `features/chat` contains conversation behavior, CHAT/KNOWLEDGE routing,

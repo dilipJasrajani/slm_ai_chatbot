@@ -8,8 +8,10 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
           ? null
           : downloadToken!.trim();
 
+  // The current local model configuration remains isolated in this
+  // infrastructure implementation.
   static const modelFileName = 'Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm';
-  static const _modelUrl =
+  static const _qwen3ModelUrl =
       'https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/'
       '$modelFileName';
 
@@ -33,7 +35,7 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
           modelType: ModelType.qwen3,
           fileType: ModelFileType.litertlm,
         )
-        .fromNetwork(_modelUrl, token: _downloadToken)
+        .fromNetwork(_qwen3ModelUrl, token: _downloadToken)
         .withProgress(onProgress)
         .install();
   }

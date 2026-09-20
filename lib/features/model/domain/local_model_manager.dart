@@ -3,6 +3,7 @@ import 'dart:async';
 import 'local_model_repository.dart';
 import 'model_status.dart';
 
+/// Coordinates local model readiness and exposes status updates to the app.
 class LocalModelManager {
   LocalModelManager(this._repository);
 
