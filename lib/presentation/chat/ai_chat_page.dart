@@ -112,6 +112,13 @@ class _AiChatPageState extends State<AiChatPage> {
         backgroundColor: widget.chatTheme.surfaceColor,
         foregroundColor: widget.chatTheme.assistantTextColor,
         actions: [
+          IconButton(
+            tooltip: 'Clear conversation',
+            onPressed: state.messages.isEmpty || state.isTyping
+                ? null
+                : _controller.clearHistory,
+            icon: const Icon(Icons.delete_outline),
+          ),
           if (kDebugMode && widget.chatIntentEvaluationRunner != null)
             IconButton(
               tooltip: 'Run routing evaluation',

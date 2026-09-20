@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_gemma_embeddings/flutter_gemma_embeddings.dart';
-import 'package:flutter_gemma_mediapipe/flutter_gemma_mediapipe.dart';
+import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
 import 'package:flutter_gemma_rag_sqlite/flutter_gemma_rag_sqlite.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -17,6 +17,7 @@ import 'data/rag/flutter_gemma_rag_sqlite_repository.dart';
 import 'data/rag/json_document_source.dart';
 import 'data/rag/json_retrieval_evaluation_dataset_source.dart';
 import 'domain/chat/chat_intent_evaluation_runner.dart';
+import 'domain/chat/conversation_history.dart';
 import 'domain/chat/deterministic_chat_intent_router.dart';
 import 'domain/chat/evaluate_chat_intent_routing_use_case.dart';
 import 'domain/llm/local_llm_service.dart';
@@ -36,7 +37,7 @@ late final AskQuestionUseCase _askQuestion;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FlutterGemma.initialize(
-    inferenceEngines: [MediaPipeEngine()],
+    inferenceEngines: [LiteRtLmEngine()],
     embeddingBackends: const [LiteRtEmbeddingBackend()],
     vectorStore: SqliteVectorStore(),
   );
@@ -72,6 +73,9 @@ Future<void> main() async {
       wellbeingMessage: chatConfiguration.wellbeingMessage,
       gratitudeMessage: chatConfiguration.gratitudeMessage,
       unsupportedQuestionMessage: chatConfiguration.unsupportedQuestionMessage,
+    ),
+    conversationHistory: InMemoryConversationHistory(
+      maxMessages: chatConfiguration.maxHistoryMessages,
     ),
   );
   final ingestDocuments = IngestDocumentsUseCase(

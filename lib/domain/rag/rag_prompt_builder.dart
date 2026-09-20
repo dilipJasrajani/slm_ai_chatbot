@@ -1,7 +1,19 @@
-class RagPromptBuilder {
-  const RagPromptBuilder();
+import '../chat/conversation_context_builder.dart';
+import '../chat/conversation_message.dart';
 
-  String build({required String question, required String context}) {
+class RagPromptBuilder {
+  const RagPromptBuilder({
+    ConversationContextBuilder contextBuilder =
+        const ConversationContextBuilder(),
+  }) : _contextBuilder = contextBuilder;
+
+  final ConversationContextBuilder _contextBuilder;
+
+  String build({
+    required String question,
+    required String context,
+    List<ConversationMessage> history = const [],
+  }) {
     return '''You are a technical knowledge assistant.
 
 Answer the user's question using the provided knowledge.
@@ -12,11 +24,17 @@ Rules:
 - If the knowledge does not contain enough information to answer, say that the information is not available in the knowledge base.
 - Keep the answer concise and useful.
 
-Knowledge:
-$context
+<conversation_history>
+${_contextBuilder.build(history)}
+</conversation_history>
 
-User question:
+<knowledge>
+$context
+</knowledge>
+
+<current_user_question>
 $question
+</current_user_question>
 
 Answer:''';
   }

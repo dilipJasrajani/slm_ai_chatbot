@@ -4,9 +4,10 @@ import '../../domain/chat/chat_intent_router.dart';
 import '../../domain/chat/chat_intent_routing_prompt_builder.dart';
 import '../../domain/chat/chat_route.dart';
 import '../../domain/chat/chat_route_parser.dart';
+import '../../domain/chat/conversation_message.dart';
 import '../../domain/llm/local_llm_service.dart';
 
-class LocalLlmChatIntentRouter implements ChatIntentRouter {
+class LocalLlmChatIntentRouter implements HistoryAwareChatIntentRouter {
   LocalLlmChatIntentRouter({
     required LocalLlmService llmService,
     this.fallbackRouter,
@@ -24,34 +25,34 @@ class LocalLlmChatIntentRouter implements ChatIntentRouter {
 
   @override
   Future<ChatRoute> route(String message) async {
-    _log('Input: $message');
+    return routeWithHistory(message);
+  }
+
+  @override
+  Future<ChatRoute> routeWithHistory(
+    String message, {
+    List<ConversationMessage> history = const [],
+  }) async {
+    _log('historyMessageCount=${history.length}');
     try {
+      final routerInput = _promptBuilder.build(message, history: history);
+      _log('ROUTER INPUT:\n$routerInput');
       final response = StringBuffer();
-      await for (final chunk in _llmService.generate(
-        _promptBuilder.build(message),
-      )) {
+      await for (final chunk in _llmService.generate(routerInput)) {
         response.write(chunk);
       }
       final rawOutput = response.toString();
-      _log('Raw model output: $rawOutput');
-      _log(
-        'Raw model output (escaped): '
-        '${rawOutput.replaceAll('\\', r'\\').replaceAll('\n', r'\n')}',
-      );
-      if (tryParseChatRouteLabel(rawOutput) == null) {
-        _log('Invalid router output. Defaulting to KNOWLEDGE.');
-      }
       final route = _parser.parse(rawOutput);
-      _log('Parsed route: ${route.label}');
+      _log('ROUTER RESULT:\n${route.label}');
       return route;
     } catch (_) {
       final fallbackRouter = this.fallbackRouter;
       if (fallbackRouter != null) {
-        final route = await fallbackRouter.route(message);
-        _log('Parsed route: ${route.label}');
+        final route = fallbackRouter is HistoryAwareChatIntentRouter
+            ? await fallbackRouter.routeWithHistory(message, history: history)
+            : await fallbackRouter.route(message);
         return route;
       }
-      _log('Parsed route: ${ChatRoute.knowledge.label}');
       return ChatRoute.knowledge;
     }
   }

@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_gemma: 1.0.0-rc.1
   flutter_gemma_embeddings: 1.0.0-rc.1
+  flutter_gemma_litertlm: 1.0.0-rc.1
   flutter_gemma_mediapipe: 1.0.0-rc.1
   flutter_gemma_rag_sqlite: 1.0.0-rc.1
   path_provider: ^2.1.5

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/domain/chat/chat_intent_router.dart';
 import 'package:slm_ai_chatbot/domain/chat/chat_route.dart';
+import 'package:slm_ai_chatbot/domain/chat/conversation_history.dart';
+import 'package:slm_ai_chatbot/domain/chat/conversation_message.dart';
 import 'package:slm_ai_chatbot/domain/chat/conversational_prompt_builder.dart';
 import 'package:slm_ai_chatbot/domain/llm/local_llm_service.dart';
 import 'package:slm_ai_chatbot/domain/rag/ask_question_use_case.dart';
@@ -20,6 +22,7 @@ void main() {
       final llmService = _FakeLlmService(
         () => Stream.value('Check Wi-Fi settings.'),
       );
+
       final contextBuilder = _RecordingContextBuilder();
       final promptBuilder = _RecordingPromptBuilder();
       final useCase = AskQuestionUseCase(
@@ -47,6 +50,29 @@ void main() {
         'Why can my device not connect to the network?',
       );
       expect(llmService.prompt, 'prompt:context:error-e123');
+    },
+  );
+
+  test(
+    'uses the default retrieval query builder when none is provided',
+    () async {
+      final ragRepository = _FakeRagRepository([_networkResult]);
+      final useCase = AskQuestionUseCase(
+        ragRepository: ragRepository,
+        llmService: _FakeLlmService(() => Stream.value('Connected.')),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
+        retrievalQueryBuilder: null,
+      );
+
+      final result = await useCase(
+        'Why can my device not connect to the network?',
+      );
+
+      expect(result.status, QuestionAnswerStatus.answered);
+      expect(
+        ragRepository.query,
+        'Why can my device not connect to the network?',
+      );
     },
   );
 
@@ -95,6 +121,38 @@ void main() {
     );
     expect(llmService.prompt, isNull);
   });
+
+  test(
+    'uses conversation context for follow-up retrieval and grounding',
+    () async {
+      final history = InMemoryConversationHistory();
+      history.addAll(const [
+        ConversationMessage(
+          author: ConversationAuthor.user,
+          text: 'What does E123 mean?',
+        ),
+        ConversationMessage(
+          author: ConversationAuthor.assistant,
+          text: 'E123 is a network connection error.',
+        ),
+      ]);
+      final ragRepository = _FakeRagRepository([_networkResult]);
+      final useCase = AskQuestionUseCase(
+        ragRepository: ragRepository,
+        llmService: _FakeLlmService(() => Stream.value('Check Wi-Fi.')),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
+        conversationHistory: history,
+      );
+
+      final result = await useCase('How can I fix it?');
+
+      expect(result.status, QuestionAnswerStatus.answered);
+      expect(ragRepository.query, '''
+User: What does E123 mean?
+Assistant: E123 is a network connection error.
+User: How can I fix it?''');
+    },
+  );
 
   test(
     'routes chat messages to conversational generation without searching knowledge',
@@ -231,6 +289,71 @@ void main() {
       );
     },
   );
+
+  test('uses stored history for chat without searching knowledge', () async {
+    final history = InMemoryConversationHistory();
+    history.addAll(const [
+      ConversationMessage(author: ConversationAuthor.user, text: 'Hello'),
+      ConversationMessage(
+        author: ConversationAuthor.assistant,
+        text: 'Hi there.',
+      ),
+    ]);
+    final ragRepository = _FakeRagRepository([_networkResult]);
+    final llmService = _FakeLlmService(() => Stream.value('You too.'));
+    final router = _HistoryRouter(ChatRoute.chat);
+    final useCase = AskQuestionUseCase(
+      ragRepository: ragRepository,
+      llmService: llmService,
+      intentRouter: router,
+      conversationHistory: history,
+    );
+
+    await useCase('How are you?');
+
+    expect(ragRepository.query, isNull);
+    expect(router.history.map((message) => message.text), [
+      'Hello',
+      'Hi there.',
+    ]);
+    expect(
+      llmService.prompt,
+      allOf(contains('Hello'), contains('How are you?')),
+    );
+    expect(history.messages.map((message) => message.text), [
+      'Hello',
+      'Hi there.',
+      'How are you?',
+      'You too.',
+    ]);
+  });
+
+  test(
+    'uses history for relevant knowledge and preserves empty history',
+    () async {
+      final history = InMemoryConversationHistory();
+      final llmService = _FakeLlmService(() => Stream.value('Check Wi-Fi.'));
+      final router = _HistoryRouter(ChatRoute.knowledge);
+      final useCase = AskQuestionUseCase(
+        ragRepository: _FakeRagRepository([_networkResult]),
+        llmService: llmService,
+        intentRouter: router,
+        conversationHistory: history,
+      );
+
+      final result = await useCase('Why can my device not connect to network?');
+
+      expect(result.status, QuestionAnswerStatus.answered);
+      expect(router.history, isEmpty);
+      expect(
+        llmService.prompt,
+        allOf(contains('<knowledge>'), contains('<conversation_history>')),
+      );
+      expect(history.messages, hasLength(2));
+      useCase.clearHistory();
+      expect(history.messages, isEmpty);
+    },
+  );
 }
 
 const _networkResult = RagSearchResult(
@@ -250,6 +373,25 @@ class _FixedChatIntentRouter implements ChatIntentRouter {
 
   @override
   Future<ChatRoute> route(String message) async => routeValue;
+}
+
+class _HistoryRouter implements HistoryAwareChatIntentRouter {
+  _HistoryRouter(this.routeValue);
+
+  final ChatRoute routeValue;
+  List<ConversationMessage> history = const [];
+
+  @override
+  Future<ChatRoute> route(String message) async => routeValue;
+
+  @override
+  Future<ChatRoute> routeWithHistory(
+    String message, {
+    List<ConversationMessage> history = const [],
+  }) async {
+    this.history = history;
+    return routeValue;
+  }
 }
 
 class _FakeRagRepository implements RagRepository {
@@ -327,7 +469,11 @@ class _RecordingPromptBuilder extends RagPromptBuilder {
   String? question;
 
   @override
-  String build({required String question, required String context}) {
+  String build({
+    required String question,
+    required String context,
+    List<ConversationMessage> history = const [],
+  }) {
     this.question = question;
     return 'prompt:$context';
   }
@@ -338,7 +484,7 @@ class _RecordingConversationalPromptBuilder
   String? message;
 
   @override
-  String build(String message) {
+  String build(String message, {List<ConversationMessage> history = const []}) {
     this.message = message;
     return 'chat:$message';
   }

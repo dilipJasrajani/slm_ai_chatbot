@@ -8,9 +8,9 @@ class FlutterGemmaLocalModelRepository implements LocalModelRepository {
           ? null
           : downloadToken!.trim();
 
-  static const modelFileName = 'gemma3-270m-it-q8.task';
+  static const modelFileName = 'Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm';
   static const _modelUrl =
-      'https://huggingface.co/litert-community/gemma-3-270m-it/resolve/main/'
+      'https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/'
       '$modelFileName';
 
   final String? _downloadToken;
@@ -30,8 +30,8 @@ class FlutterGemmaLocalModelRepository implements LocalModelRepository {
     required void Function(int progress) onProgress,
   }) async {
     await FlutterGemma.installModel(
-          modelType: ModelType.gemmaIt,
-          fileType: ModelFileType.task,
+          modelType: ModelType.qwen3,
+          fileType: ModelFileType.litertlm,
         )
         .fromNetwork(_modelUrl, token: _downloadToken)
         .withProgress(onProgress)

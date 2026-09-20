@@ -138,6 +138,7 @@ class AiChatConfiguration {
     this.suggestions = const [],
     this.showLocalSources = true,
     this.scrollThreshold = 160,
+    this.maxHistoryMessages = 6,
   });
 
   final String title;
@@ -150,4 +151,5 @@ class AiChatConfiguration {
   final List<String> suggestions;
   final bool showLocalSources;
   final double scrollThreshold;
+  final int maxHistoryMessages;
 }

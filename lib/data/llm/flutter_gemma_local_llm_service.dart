@@ -1,5 +1,7 @@
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
+import '../infrastructure/qwen3_output_channel_parser.dart';
 import '../../domain/llm/local_llm_service.dart';
 
 class FlutterGemmaLocalLlmService implements LocalLlmService {
@@ -24,17 +26,30 @@ class FlutterGemmaLocalLlmService implements LocalLlmService {
       temperature: 1.0,
       topK: 64,
       topP: 0.95,
+      enableThinking: false,
     );
     _activeSession = session;
 
     try {
       await session.addQueryChunk(Message(text: prompt, isUser: true));
-      yield* session.getResponseAsync();
+      yield* Qwen3OutputChannelParser().parse(
+        _logRawOutput(session.getResponseAsync()),
+      );
     } finally {
       if (identical(_activeSession, session)) {
         _activeSession = null;
       }
+
       await session.close();
+    }
+  }
+
+  Stream<String> _logRawOutput(Stream<String> output) async* {
+    await for (final chunk in output) {
+      if (kDebugMode) {
+        debugPrint('[Qwen] Raw output: $chunk');
+      }
+      yield chunk;
     }
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/domain/llm/local_llm_service.dart';
+import 'package:slm_ai_chatbot/domain/chat/conversation_history.dart';
 import 'package:slm_ai_chatbot/domain/model/local_model_manager.dart';
 import 'package:slm_ai_chatbot/domain/model/local_model_repository.dart';
 import 'package:slm_ai_chatbot/domain/rag/ask_question_use_case.dart';
@@ -44,6 +45,31 @@ void main() {
     );
 
     await response.close();
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
+  test('clears visual and domain conversation history', () async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final history = InMemoryConversationHistory();
+    final controller = ChatController(
+      modelManager: modelManager,
+      askQuestion: AskQuestionUseCase(
+        ragRepository: _RagRepository(),
+        llmService: _LlmService(Stream.value('Hello!')),
+        conversationHistory: history,
+      ),
+    );
+
+    await controller.send('Hi');
+    expect(controller.state.messages, hasLength(2));
+    expect(history.messages, hasLength(2));
+
+    controller.clearHistory();
+    expect(controller.state.messages, isEmpty);
+    expect(history.messages, isEmpty);
+
     controller.dispose();
     await modelManager.dispose();
   });

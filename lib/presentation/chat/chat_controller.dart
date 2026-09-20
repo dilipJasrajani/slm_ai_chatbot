@@ -126,6 +126,12 @@ class ChatController extends ChangeNotifier {
     return question == null ? Future<void>.value() : send(question);
   }
 
+  void clearHistory() {
+    if (state.isTyping) return;
+    _askQuestion.clearHistory();
+    _setState(state.copyWith(messages: const []));
+  }
+
   void _onModelState(ModelState modelState) {
     _setState(state.copyWith(modelState: modelState));
   }
