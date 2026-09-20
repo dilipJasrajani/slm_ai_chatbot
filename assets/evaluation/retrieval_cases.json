@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "network-exact-identifier",
+      "query": "E123",
+      "expectedDocumentIds": ["error-e123"]
+    },
+    {
+      "id": "network-exact-wording",
+      "query": "The device cannot connect to the network.",
+      "expectedDocumentIds": ["error-e123"]
+    },
+    {
+      "id": "network-natural-language",
+      "query": "My device won't connect to Wi-Fi.",
+      "expectedDocumentIds": ["error-e123"]
+    },
+    {
+      "id": "network-paraphrase",
+      "query": "The device is unable to establish a network connection.",
+      "expectedDocumentIds": ["error-e123"]
+    },
+    {
+      "id": "network-symptom",
+      "query": "I'm unable to get the device online.",
+      "expectedDocumentIds": ["error-e123"]
+    },
+    {
+      "id": "network-cause",
+      "query": "Why might the device fail to connect to the network?",
+      "expectedDocumentIds": ["error-e123"]
+    },
+    {
+      "id": "authentication",
+      "query": "Why did authentication fail?",
+      "expectedDocumentIds": ["error-e456"]
+    },
+    {
+      "id": "timeout",
+      "query": "The device is timing out while communicating.",
+      "expectedDocumentIds": ["error-e789"]
+    },
+    {
+      "id": "unrelated-capital",
+      "query": "What is the capital of France?",
+      "expectedDocumentIds": []
+    },
+    {
+      "id": "unrelated-joke",
+      "query": "Tell me a joke.",
+      "expectedDocumentIds": []
+    },
+    {
+      "id": "unrelated-weather",
+      "query": "What is the weather today?",
+      "expectedDocumentIds": []
+    },
+    {
+      "id": "unrelated-poem",
+      "query": "Write me a poem.",
+      "expectedDocumentIds": []
+    },
+    {
+      "id": "unrelated-sports",
+      "query": "Who won yesterday's cricket match?",
+      "expectedDocumentIds": []
+    }
+  ]
+}

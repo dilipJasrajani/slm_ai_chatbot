@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../domain/llm/local_llm_service.dart';
@@ -7,6 +8,8 @@ import '../domain/model/local_model_manager.dart';
 import '../domain/model/model_status.dart';
 import '../domain/rag/ingest_documents_use_case.dart';
 import '../domain/rag/knowledge_document.dart';
+import '../domain/rag/retrieval_evaluation_result.dart';
+import '../domain/rag/retrieval_evaluation_runner.dart';
 import '../domain/rag/technical_support_rag_proof_of_concept.dart';
 
 class LocalInferenceScreen extends StatefulWidget {
@@ -14,12 +17,14 @@ class LocalInferenceScreen extends StatefulWidget {
     required this.modelManager,
     required this.llmService,
     required this.ragProofOfConcept,
+    this.retrievalEvaluationRunner,
     super.key,
   });
 
   final LocalModelManager modelManager;
   final LocalLlmService llmService;
   final TechnicalSupportRagProofOfConcept ragProofOfConcept;
+  final RetrievalEvaluationRunner? retrievalEvaluationRunner;
 
   @override
   State<LocalInferenceScreen> createState() => _LocalInferenceScreenState();
@@ -32,12 +37,14 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
   StreamSubscription<ModelState>? _modelStateSubscription;
   var _isGenerating = false;
   var _isRunningRag = false;
+  var _isRunningEvaluation = false;
   var _response = '';
   String? _generationError;
   String? _ragStatus;
   String? _ragQuestion;
   List<KnowledgeDocument> _retrievedDocuments = const [];
   String? _ragAnswer;
+  String? _evaluationReport;
 
   @override
   void initState() {
@@ -130,6 +137,68 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
     }
   }
 
+  Future<void> _runRetrievalEvaluation() async {
+    final runner = widget.retrievalEvaluationRunner;
+    if (runner == null || _isRunningEvaluation) return;
+
+    setState(() {
+      _isRunningEvaluation = true;
+      _evaluationReport = null;
+      _ragStatus = 'Preparing documents for retrieval evaluation...';
+    });
+    try {
+      final summary = await runner.run(
+        onIngestionProgress: _showIngestionProgress,
+      );
+      if (mounted) {
+        setState(() {
+          _evaluationReport = _formatEvaluationSummary(summary);
+          _ragStatus = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _evaluationReport = 'Retrieval evaluation failed: $error',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRunningEvaluation = false);
+      }
+    }
+  }
+
+  String _formatEvaluationSummary(RetrievalEvaluationSummary summary) {
+    final buffer = StringBuffer()
+      ..writeln('Retrieval Evaluation')
+      ..writeln()
+      ..writeln('Cases: ${summary.totalCases}')
+      ..writeln('Expected-match cases: ${summary.expectedMatchCaseCount}')
+      ..writeln('Hit Rate@1: ${_formatPercent(summary.hitRateAt1)}')
+      ..writeln('Hit Rate@3: ${_formatPercent(summary.hitRateAt3)}')
+      ..writeln('Passed: ${summary.passedCaseCount}')
+      ..writeln('Failed: ${summary.failedCaseCount}')
+      ..writeln('No-known-match: ${summary.noKnownMatchCaseCount}')
+      ..writeln();
+    for (final result in summary.results) {
+      buffer.writeln(
+        '${result.caseId.padRight(32)} ${_formatStatus(result.status)}',
+      );
+    }
+    return buffer.toString().trimRight();
+  }
+
+  String _formatPercent(double rate) => '${(rate * 100).toStringAsFixed(0)}%';
+
+  String _formatStatus(RetrievalEvaluationStatus status) {
+    return switch (status) {
+      RetrievalEvaluationStatus.passed => 'PASS',
+      RetrievalEvaluationStatus.failed => 'FAIL',
+      RetrievalEvaluationStatus.noKnownMatch => 'NO-KNOWN-MATCH',
+    };
+  }
+
   void _showIngestionProgress(DocumentIngestionProgress progress) {
     if (!mounted) return;
 
@@ -195,6 +264,23 @@ class _LocalInferenceScreenState extends State<LocalInferenceScreen> {
                       : 'Run Local RAG Question Answering',
                 ),
               ),
+              if (kDebugMode && widget.retrievalEvaluationRunner != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: _isRunningEvaluation
+                      ? null
+                      : _runRetrievalEvaluation,
+                  child: Text(
+                    _isRunningEvaluation
+                        ? 'Running Retrieval Evaluation...'
+                        : 'Run Retrieval Evaluation (Debug)',
+                  ),
+                ),
+                if (_evaluationReport != null) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(_evaluationReport!),
+                ],
+              ],
               if (_ragQuestion != null) ...[
                 const SizedBox(height: 16),
                 const Text('Question:'),

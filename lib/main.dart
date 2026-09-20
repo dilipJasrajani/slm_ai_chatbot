@@ -13,16 +13,20 @@ import 'data/llm/flutter_gemma_local_model_repository.dart';
 import 'data/rag/flutter_gemma_embedding_model_initializer.dart';
 import 'data/rag/flutter_gemma_rag_sqlite_repository.dart';
 import 'data/rag/json_document_source.dart';
+import 'data/rag/json_retrieval_evaluation_dataset_source.dart';
 import 'domain/llm/local_llm_service.dart';
 import 'domain/model/local_model_manager.dart';
 import 'domain/rag/ask_question_use_case.dart';
+import 'domain/rag/chat_response_configuration.dart';
+import 'domain/rag/evaluate_retrieval_use_case.dart';
 import 'domain/rag/ingest_documents_use_case.dart';
-import 'domain/rag/technical_support_rag_proof_of_concept.dart';
-import 'presentation/local_inference_screen.dart';
+import 'domain/rag/retrieval_evaluation_runner.dart';
+import 'presentation/chat/ai_chat_page.dart';
+import 'presentation/chat/chat_models.dart';
 
 late final LocalModelManager _modelManager;
 late final LocalLlmService _llmService;
-late final TechnicalSupportRagProofOfConcept _ragProofOfConcept;
+late final AskQuestionUseCase _askQuestion;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +39,7 @@ Future<void> main() async {
   final modelRepository = FlutterGemmaLocalModelRepository(
     downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
   );
+  const chatConfiguration = AiChatConfiguration();
   _modelManager = LocalModelManager(modelRepository);
   _llmService = FlutterGemmaLocalLlmService(
     modelProvider: () async => modelRepository.loadedModel,
@@ -49,23 +54,36 @@ Future<void> main() async {
       return '${directory.path}/technical_support_rag.db';
     },
   );
-  _ragProofOfConcept = TechnicalSupportRagProofOfConcept(
-    ingestDocuments: IngestDocumentsUseCase(
-      documentSource: JsonDocumentSource(assetBundle: rootBundle),
-      ragRepository: ragRepository,
+  _askQuestion = AskQuestionUseCase(
+    ragRepository: ragRepository,
+    llmService: _llmService,
+    responseConfiguration: ChatResponseConfiguration(
+      greetingMessage: chatConfiguration.greetingMessage,
+      wellbeingMessage: chatConfiguration.wellbeingMessage,
+      gratitudeMessage: chatConfiguration.gratitudeMessage,
+      unsupportedQuestionMessage: chatConfiguration.unsupportedQuestionMessage,
     ),
-    askQuestion: AskQuestionUseCase(
-      ragRepository: ragRepository,
-      llmService: _llmService,
+  );
+  final ingestDocuments = IngestDocumentsUseCase(
+    documentSource: JsonDocumentSource(assetBundle: rootBundle),
+    ragRepository: ragRepository,
+  );
+  final retrievalEvaluationRunner = RetrievalEvaluationRunner(
+    ingestDocuments: ingestDocuments,
+    datasetSource: JsonRetrievalEvaluationDatasetSource(
+      assetBundle: rootBundle,
     ),
+    evaluateRetrieval: EvaluateRetrievalUseCase(ragRepository: ragRepository),
   );
   unawaited(_modelManager.ensureReady());
 
   runApp(
     MyApp(
       modelManager: _modelManager,
-      llmService: _llmService,
-      ragProofOfConcept: _ragProofOfConcept,
+      askQuestion: _askQuestion,
+      chatConfiguration: chatConfiguration,
+      retrievalEvaluationRunner: retrievalEvaluationRunner,
+      prepareKnowledgeBase: () async => ingestDocuments(),
     ),
   );
 }
@@ -73,24 +91,30 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   const MyApp({
     required this.modelManager,
-    required this.llmService,
-    required this.ragProofOfConcept,
+    required this.askQuestion,
+    this.retrievalEvaluationRunner,
+    this.prepareKnowledgeBase,
+    this.chatConfiguration = const AiChatConfiguration(),
     super.key,
   });
 
   final LocalModelManager modelManager;
-  final LocalLlmService llmService;
-  final TechnicalSupportRagProofOfConcept ragProofOfConcept;
+  final AskQuestionUseCase askQuestion;
+  final RetrievalEvaluationRunner? retrievalEvaluationRunner;
+  final Future<void> Function()? prepareKnowledgeBase;
+  final AiChatConfiguration chatConfiguration;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Local Gemma Test',
+      title: 'Offline Assistant',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.deepPurple)),
-      home: LocalInferenceScreen(
+      home: AiChatPage(
         modelManager: modelManager,
-        llmService: llmService,
-        ragProofOfConcept: ragProofOfConcept,
+        askQuestion: askQuestion,
+        configuration: chatConfiguration,
+        prepareKnowledgeBase: prepareKnowledgeBase,
+        retrievalEvaluationRunner: retrievalEvaluationRunner,
       ),
     );
   }

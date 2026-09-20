@@ -1,112 +1,89 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/domain/llm/local_llm_service.dart';
 import 'package:slm_ai_chatbot/domain/model/local_model_manager.dart';
 import 'package:slm_ai_chatbot/domain/model/local_model_repository.dart';
 import 'package:slm_ai_chatbot/domain/rag/ask_question_use_case.dart';
-import 'package:slm_ai_chatbot/domain/rag/document_source.dart';
-import 'package:slm_ai_chatbot/domain/rag/ingest_documents_use_case.dart';
 import 'package:slm_ai_chatbot/domain/rag/knowledge_document.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_document.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_repository.dart';
 import 'package:slm_ai_chatbot/domain/rag/rag_search_result.dart';
-import 'package:slm_ai_chatbot/domain/rag/technical_support_rag_proof_of_concept.dart';
 import 'package:slm_ai_chatbot/main.dart';
+import 'package:slm_ai_chatbot/presentation/chat/chat_models.dart';
 
 void main() {
-  testWidgets('streams a local test response', (WidgetTester tester) async {
+  testWidgets('composes, streams, and retries a chat answer', (tester) async {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
-    final llmService = _FakeLocalLlmService(
-      response: Stream<String>.fromIterable(['Hello', ' from Gemma.']),
-    );
+    final firstResponse = StreamController<String>();
+    var attempts = 0;
+    final llmService = _FakeLlmService(() {
+      attempts++;
+      return attempts == 1 ? firstResponse.stream : Stream.value('Recovered.');
+    });
 
     await tester.pumpWidget(
-      MyApp(
-        modelManager: modelManager,
-        llmService: llmService,
-        ragProofOfConcept: _proofOfConcept(),
-      ),
-    );
-    await tester.tap(find.text('Generate Test Response'));
-    await tester.pump();
-    await tester.pump();
-
-    expect(llmService.prompt, 'Hello! Introduce yourself in one sentence.');
-    expect(find.text('Hello from Gemma.'), findsOneWidget);
-
-    await modelManager.dispose();
-  });
-
-  testWidgets('shows local inference errors', (WidgetTester tester) async {
-    final modelManager = LocalModelManager(_ReadyModelRepository());
-    await modelManager.ensureReady();
-    final llmService = _FakeLocalLlmService(
-      response: Stream<String>.error(StateError('Local inference failed')),
+      MyApp(modelManager: modelManager, askQuestion: _askQuestion(llmService)),
     );
 
-    await tester.pumpWidget(
-      MyApp(
-        modelManager: modelManager,
-        llmService: llmService,
-        ragProofOfConcept: _proofOfConcept(),
-      ),
+    await tester.enterText(
+      find.byType(TextField),
+      'Why can my device not connect to the network?',
     );
-    await tester.tap(find.text('Generate Test Response'));
-    await tester.pump();
-
-    expect(find.textContaining('Local inference failed'), findsOneWidget);
-
-    await modelManager.dispose();
-  });
-
-  testWidgets('shows the retrieved local RAG proof-of-concept document', (
-    WidgetTester tester,
-  ) async {
-    final modelManager = LocalModelManager(_ReadyModelRepository());
-    await modelManager.ensureReady();
-
-    await tester.pumpWidget(
-      MyApp(
-        modelManager: modelManager,
-        llmService: _FakeLocalLlmService(
-          response: const Stream<String>.empty(),
-        ),
-        ragProofOfConcept: _proofOfConcept(),
-      ),
-    );
-    await tester.tap(find.text('Run Local RAG Question Answering'));
+    await tester.tap(find.byTooltip('Send message'));
     await tester.pump();
 
     expect(
-      find.textContaining('Device cannot connect to network'),
+      find.text('Why can my device not connect to the network?'),
       findsOneWidget,
     );
-    expect(find.textContaining('Check that Wi-Fi is enabled.'), findsOneWidget);
+    expect(find.text('Thinking…'), findsOneWidget);
 
+    firstResponse.add('Check ');
+    await tester.pump();
+    expect(find.text('Check '), findsOneWidget);
+
+    firstResponse.addError(Exception('generation failed'));
+    await tester.pump();
+    expect(
+      find.text('Unable to generate an answer with the local AI model.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsOneWidget);
+
+    await tester.tap(find.text('Retry'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Recovered.'), findsOneWidget);
+    expect(attempts, 2);
+
+    unawaited(firstResponse.close());
     await modelManager.dispose();
+  });
+
+  test('chat defaults are white-label and local-source aware', () {
+    const configuration = AiChatConfiguration();
+    const theme = AiChatTheme();
+
+    expect(configuration.showLocalSources, isTrue);
+    expect(configuration.scrollThreshold, 160);
+    expect(theme.avatarLabel, 'AI');
   });
 }
 
-TechnicalSupportRagProofOfConcept _proofOfConcept() {
-  final ragRepository = _FakeRagRepository();
-  return TechnicalSupportRagProofOfConcept(
-    ingestDocuments: IngestDocumentsUseCase(
-      documentSource: const _FakeDocumentSource(),
-      ragRepository: ragRepository,
-    ),
-    askQuestion: AskQuestionUseCase(
-      ragRepository: ragRepository,
-      llmService: _FakeLocalLlmService(
-        response: Stream<String>.value('Check that Wi-Fi is enabled.'),
-      ),
-    ),
+AskQuestionUseCase _askQuestion(_FakeLlmService llmService) {
+  return AskQuestionUseCase(
+    ragRepository: _FakeRagRepository(),
+    llmService: llmService,
   );
 }
 
 class _ReadyModelRepository implements LocalModelRepository {
   @override
   Future<void> download({required void Function(int progress) onProgress}) {
-    throw UnsupportedError('The test model is already installed.');
+    throw UnsupportedError('Already installed');
   }
 
   @override
@@ -116,20 +93,16 @@ class _ReadyModelRepository implements LocalModelRepository {
   Future<void> load() async {}
 }
 
-class _FakeLocalLlmService implements LocalLlmService {
-  _FakeLocalLlmService({required this.response});
+class _FakeLlmService implements LocalLlmService {
+  _FakeLlmService(this._responses);
 
-  final Stream<String> response;
-  String? prompt;
+  final Stream<String> Function() _responses;
 
   @override
   Future<void> dispose() async {}
 
   @override
-  Stream<String> generate(String prompt) {
-    this.prompt = prompt;
-    return response;
-  }
+  Stream<String> generate(String prompt) => _responses();
 
   @override
   Future<void> stop() async {}
@@ -146,33 +119,17 @@ class _FakeRagRepository implements RagRepository {
   Future<List<RagSearchResult>> search({
     required String query,
     int topK = 1,
-    double threshold = 0.0,
+    double threshold = 0,
   }) async {
     return const [
       RagSearchResult(
         document: KnowledgeDocument(
-          id: 'error-e123',
-          title: 'Device cannot connect to network',
-          content: 'The device failed to establish a network connection.',
-          metadata: {'type': 'error', 'code': 'E123'},
+          id: 'network',
+          title: 'Device network connection guide',
+          content: 'Connect the device to the network.',
+          metadata: {},
         ),
-        similarity: 1.0,
-      ),
-    ];
-  }
-}
-
-class _FakeDocumentSource implements DocumentSource {
-  const _FakeDocumentSource();
-
-  @override
-  Future<List<KnowledgeDocument>> loadDocuments() async {
-    return const [
-      KnowledgeDocument(
-        id: 'error-e123',
-        title: 'Device cannot connect to network',
-        content: 'The device failed to establish a network connection.',
-        metadata: {'type': 'error', 'code': 'E123'},
+        similarity: 1,
       ),
     ];
   }
