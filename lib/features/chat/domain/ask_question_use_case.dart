@@ -8,13 +8,13 @@ import 'package:slm_ai_chatbot/features/chat/domain/conversation_message.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversational_prompt_builder.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/deterministic_chat_intent_router.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
-import 'document_context_builder.dart';
-import 'knowledge_document.dart';
-import 'rag_prompt_builder.dart';
-import 'rag_repository.dart';
-import 'rag_search_result.dart';
-import 'retrieval_query_builder.dart';
-import 'retrieved_knowledge_relevance.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/document_context_builder.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/rag_prompt_builder.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/retrieval_query_builder.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/retrieved_knowledge_relevance.dart';
 
 enum QuestionAnswerStatus {
   answered,
@@ -91,16 +91,31 @@ class AskQuestionUseCase {
     _debugLog('HISTORY:\n${_formatHistory(history)}');
     final route = await _routeQuestion(question, history);
     _debugLog('ROUTER RESULT:\n${route.label}');
-    if (route == ChatRoute.chat) {
-      final prompt = _conversationalPromptBuilder.build(
-        question,
-        history: history,
-      );
-      _debugLog('FALLBACK:\nfalse');
-      yield* _generateAndStore(prompt, const [], question);
-      return;
+    switch (route) {
+      case ChatRoute.chat:
+        yield* _handleChatRequest(question, history);
+        return;
+      case ChatRoute.knowledge:
+        yield* _handleKnowledgeRequest(question, history);
     }
+  }
 
+  Stream<QuestionAnswer> _handleChatRequest(
+    String question,
+    List<ConversationMessage> history,
+  ) async* {
+    final prompt = _conversationalPromptBuilder.build(
+      question,
+      history: history,
+    );
+    _debugLog('FALLBACK:\nfalse');
+    yield* _generateAndStore(prompt, const [], question);
+  }
+
+  Stream<QuestionAnswer> _handleKnowledgeRequest(
+    String question,
+    List<ConversationMessage> history,
+  ) async* {
     final retrievalQuery =
         (_retrievalQueryBuilder ?? const RetrievalQueryBuilder()).build(
           question: question,

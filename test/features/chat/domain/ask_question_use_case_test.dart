@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_intent_router.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_response_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_route.dart';
@@ -6,7 +7,6 @@ import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_message.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversational_prompt_builder.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
-import 'package:slm_ai_chatbot/features/rag/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/document_context_builder.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_document.dart';

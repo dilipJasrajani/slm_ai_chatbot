@@ -1,4 +1,4 @@
-import '../../domain/ask_question_use_case.dart';
+import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import '../../domain/ingest_documents_use_case.dart';
 
 class TechnicalSupportRagProofOfConcept {

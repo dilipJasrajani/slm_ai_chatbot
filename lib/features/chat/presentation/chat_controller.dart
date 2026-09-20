@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
-import 'package:slm_ai_chatbot/features/rag/domain/ask_question_use_case.dart';
 import 'chat_models.dart';
 
 class ChatController extends ChangeNotifier {

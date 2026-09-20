@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:slm_ai_chatbot/features/chat/data/local_llm_chat_intent_router.dart';
+import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_response_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/deterministic_chat_intent_router.dart';
@@ -18,7 +19,6 @@ import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_embedding_model_initializer.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_rag_sqlite_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/data/json_document_source.dart';
-import 'package:slm_ai_chatbot/features/rag/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/ingest_documents_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/data/json_retrieval_evaluation_dataset_source.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/evaluate_retrieval_use_case.dart';

@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/chat_controller.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';
-import 'package:slm_ai_chatbot/features/rag/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_document.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
