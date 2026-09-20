@@ -1,4 +1,7 @@
-import 'chat_intent_classifier.dart';
+import '../chat/chat_intent_router.dart';
+import '../chat/chat_route.dart';
+import '../chat/conversational_prompt_builder.dart';
+import '../chat/deterministic_chat_intent_router.dart';
 import 'chat_response_configuration.dart';
 import '../llm/local_llm_service.dart';
 import 'document_context_builder.dart';
@@ -34,7 +37,9 @@ class AskQuestionUseCase {
     required LocalLlmService llmService,
     DocumentContextBuilder contextBuilder = const DocumentContextBuilder(),
     RagPromptBuilder promptBuilder = const RagPromptBuilder(),
-    ChatIntentClassifier intentClassifier = const ChatIntentClassifier(),
+    ChatIntentRouter intentRouter = const DeterministicChatIntentRouter(),
+    ConversationalPromptBuilder conversationalPromptBuilder =
+        const ConversationalPromptBuilder(),
     RetrievedKnowledgeRelevance relevance = const RetrievedKnowledgeRelevance(),
     ChatResponseConfiguration responseConfiguration =
         const ChatResponseConfiguration(),
@@ -42,7 +47,8 @@ class AskQuestionUseCase {
        _llmService = llmService,
        _contextBuilder = contextBuilder,
        _promptBuilder = promptBuilder,
-       _intentClassifier = intentClassifier,
+       _intentRouter = intentRouter,
+       _conversationalPromptBuilder = conversationalPromptBuilder,
        _relevance = relevance,
        _responseConfiguration = responseConfiguration;
 
@@ -50,7 +56,8 @@ class AskQuestionUseCase {
   final LocalLlmService _llmService;
   final DocumentContextBuilder _contextBuilder;
   final RagPromptBuilder _promptBuilder;
-  final ChatIntentClassifier _intentClassifier;
+  final ChatIntentRouter _intentRouter;
+  final ConversationalPromptBuilder _conversationalPromptBuilder;
   final RetrievedKnowledgeRelevance _relevance;
   final ChatResponseConfiguration _responseConfiguration;
 
@@ -65,12 +72,10 @@ class AskQuestionUseCase {
   /// Retrieval and generation failures are emitted as a single controlled
   /// answer, matching [call].
   Stream<QuestionAnswer> stream(String question) async* {
-    final casualResponse = _casualResponse(question);
-    if (casualResponse != null) {
-      yield QuestionAnswer(
-        status: QuestionAnswerStatus.answered,
-        answer: casualResponse,
-      );
+    final route = await _routeQuestion(question);
+    if (route == ChatRoute.chat) {
+      final prompt = _conversationalPromptBuilder.build(question);
+      yield* _generateResponse(prompt, const []);
       return;
     }
 
@@ -101,13 +106,12 @@ class AskQuestionUseCase {
     yield* _generateResponse(prompt, documents);
   }
 
-  String? _casualResponse(String question) {
-    return switch (_intentClassifier.classify(question)) {
-      ChatIntent.greeting => _responseConfiguration.greetingMessage,
-      ChatIntent.wellbeing => _responseConfiguration.wellbeingMessage,
-      ChatIntent.gratitude => _responseConfiguration.gratitudeMessage,
-      ChatIntent.knowledge => null,
-    };
+  Future<ChatRoute> _routeQuestion(String question) async {
+    try {
+      return await _intentRouter.route(question);
+    } catch (_) {
+      return ChatRoute.knowledge;
+    }
   }
 
   Stream<QuestionAnswer> _generateResponse(

@@ -63,6 +63,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/knowledge_base/documents.json
+    - assets/evaluation/chat_intent_cases.json
     - assets/evaluation/retrieval_cases.json
 
   # To add assets to your application, add an assets section, like this:

@@ -25,3 +25,11 @@ model installation; embedding generation, SQLite storage, and similarity
 retrieval are all local thereafter. Supply `HUGGING_FACE_TOKEN` with
 `--dart-define` only if the model host requires authentication. Model files are
 not committed to this repository.
+
+## Intent routing evaluation
+
+In debug builds, **Run Routing Evaluation (Debug)** evaluates the bundled
+router dataset in `assets/evaluation/chat_intent_cases.json` with the same
+local model-backed router used by chat. It reports accuracy plus average and
+maximum routing latency for the current device/session. It does not change
+packages, models, or RAG retrieval behavior.

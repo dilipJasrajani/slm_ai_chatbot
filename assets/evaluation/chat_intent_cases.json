@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "chat-greeting",
+      "message": "Hi there!",
+      "expectedRoute": "CHAT"
+    },
+    {
+      "id": "chat-wellbeing",
+      "message": "How are you doing today?",
+      "expectedRoute": "CHAT"
+    },
+    {
+      "id": "chat-gratitude",
+      "message": "Thanks for the help.",
+      "expectedRoute": "CHAT"
+    },
+    {
+      "id": "chat-casual",
+      "message": "Tell me something nice.",
+      "expectedRoute": "CHAT"
+    },
+    {
+      "id": "knowledge-network",
+      "message": "My device cannot connect to Wi-Fi.",
+      "expectedRoute": "KNOWLEDGE"
+    },
+    {
+      "id": "knowledge-error-code",
+      "message": "What does error code E123 mean?",
+      "expectedRoute": "KNOWLEDGE"
+    },
+    {
+      "id": "knowledge-authentication",
+      "message": "Why did authentication fail?",
+      "expectedRoute": "KNOWLEDGE"
+    },
+    {
+      "id": "knowledge-timeout",
+      "message": "The device keeps timing out while communicating.",
+      "expectedRoute": "KNOWLEDGE"
+    },
+    {
+      "id": "knowledge-mixed-greeting",
+      "message": "Hello, can you explain error E456?",
+      "expectedRoute": "KNOWLEDGE"
+    },
+    {
+      "id": "knowledge-installation",
+      "message": "How do I troubleshoot a failed installation?",
+      "expectedRoute": "KNOWLEDGE"
+    }
+  ]
+}

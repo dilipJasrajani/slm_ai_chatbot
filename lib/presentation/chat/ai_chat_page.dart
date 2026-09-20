@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 
+import '../../domain/chat/chat_intent_evaluation_runner.dart';
 import '../../domain/model/local_model_manager.dart';
 import '../../domain/model/model_status.dart';
 import '../../domain/rag/ask_question_use_case.dart';
@@ -15,6 +16,7 @@ class AiChatPage extends StatefulWidget {
     this.configuration = const AiChatConfiguration(),
     this.chatTheme = const AiChatTheme(),
     this.controller,
+    this.chatIntentEvaluationRunner,
     this.prepareKnowledgeBase,
     this.retrievalEvaluationRunner,
     super.key,
@@ -25,6 +27,7 @@ class AiChatPage extends StatefulWidget {
   final AiChatConfiguration configuration;
   final AiChatTheme chatTheme;
   final ChatController? controller;
+  final ChatIntentEvaluationRunner? chatIntentEvaluationRunner;
   final Future<void> Function()? prepareKnowledgeBase;
   final RetrievalEvaluationRunner? retrievalEvaluationRunner;
 
@@ -38,6 +41,7 @@ class _AiChatPageState extends State<AiChatPage> {
   final _composerController = TextEditingController();
   final _scrollController = ScrollController();
   var _shouldAutoScroll = true;
+  var _isRunningEvaluation = false;
 
   @override
   void initState() {
@@ -89,7 +93,11 @@ class _AiChatPageState extends State<AiChatPage> {
 
   void _send() {
     final text = _composerController.text;
-    if (!_controller.state.canSend || text.trim().isEmpty) return;
+    if (_isRunningEvaluation ||
+        !_controller.state.canSend ||
+        text.trim().isEmpty) {
+      return;
+    }
     _composerController.clear();
     _controller.send(text);
   }
@@ -104,10 +112,26 @@ class _AiChatPageState extends State<AiChatPage> {
         backgroundColor: widget.chatTheme.surfaceColor,
         foregroundColor: widget.chatTheme.assistantTextColor,
         actions: [
+          if (kDebugMode && widget.chatIntentEvaluationRunner != null)
+            IconButton(
+              tooltip: 'Run routing evaluation',
+              onPressed:
+                  state.modelState.status != ModelStatus.ready ||
+                      state.isTyping ||
+                      _isRunningEvaluation
+                  ? null
+                  : _runRoutingEvaluation,
+              icon: const Icon(Icons.alt_route),
+            ),
           if (kDebugMode && widget.retrievalEvaluationRunner != null)
             IconButton(
               tooltip: 'Run retrieval evaluation',
-              onPressed: _runEvaluation,
+              onPressed:
+                  state.modelState.status != ModelStatus.ready ||
+                      state.isTyping ||
+                      _isRunningEvaluation
+                  ? null
+                  : _runEvaluation,
               icon: const Icon(Icons.analytics_outlined),
             ),
         ],
@@ -152,7 +176,7 @@ class _AiChatPageState extends State<AiChatPage> {
               const SizedBox(height: 8),
             _Composer(
               controller: _composerController,
-              enabled: state.canSend,
+              enabled: state.canSend && !_isRunningEvaluation,
               onSend: _send,
               theme: widget.chatTheme,
             ),
@@ -162,19 +186,50 @@ class _AiChatPageState extends State<AiChatPage> {
     );
   }
 
+  Future<void> _runRoutingEvaluation() async {
+    final runner = widget.chatIntentEvaluationRunner;
+    if (runner == null || _isRunningEvaluation || _controller.state.isTyping) {
+      return;
+    }
+    setState(() => _isRunningEvaluation = true);
+    try {
+      final summary = await runner.run();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Routing: ${summary.passedCaseCount}/${summary.totalCases} correct, '
+            'Accuracy ${(summary.accuracy * 100).toStringAsFixed(0)}%, '
+            'Avg ${summary.averageLatency.inMilliseconds}ms, '
+            'Max ${summary.maxLatency.inMilliseconds}ms',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isRunningEvaluation = false);
+    }
+  }
+
   Future<void> _runEvaluation() async {
     final runner = widget.retrievalEvaluationRunner;
-    if (runner == null) return;
-    final summary = await runner.run();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Retrieval: ${summary.passedCaseCount}/${summary.expectedMatchCaseCount} '
-          'matches, Hit Rate@3 ${(summary.hitRateAt3 * 100).toStringAsFixed(0)}%',
+    if (runner == null || _isRunningEvaluation || _controller.state.isTyping) {
+      return;
+    }
+    setState(() => _isRunningEvaluation = true);
+    try {
+      final summary = await runner.run();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Retrieval: ${summary.passedCaseCount}/${summary.expectedMatchCaseCount} '
+            'matches, Hit Rate@3 ${(summary.hitRateAt3 * 100).toStringAsFixed(0)}%',
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _isRunningEvaluation = false);
+    }
   }
 }
 

@@ -1,4 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:slm_ai_chatbot/domain/chat/chat_intent_router.dart';
+import 'package:slm_ai_chatbot/domain/chat/chat_route.dart';
+import 'package:slm_ai_chatbot/domain/chat/conversational_prompt_builder.dart';
 import 'package:slm_ai_chatbot/domain/llm/local_llm_service.dart';
 import 'package:slm_ai_chatbot/domain/rag/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/domain/rag/chat_response_configuration.dart';
@@ -14,7 +17,9 @@ void main() {
     'retrieves documents, builds a prompt, and generates an answer',
     () async {
       final ragRepository = _FakeRagRepository([_networkResult]);
-      final llmService = _FakeLlmService(Stream.value('Check Wi-Fi settings.'));
+      final llmService = _FakeLlmService(
+        () => Stream.value('Check Wi-Fi settings.'),
+      );
       final contextBuilder = _RecordingContextBuilder();
       final promptBuilder = _RecordingPromptBuilder();
       final useCase = AskQuestionUseCase(
@@ -22,6 +27,7 @@ void main() {
         llmService: llmService,
         contextBuilder: contextBuilder,
         promptBuilder: promptBuilder,
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
       );
 
       final result = await useCase(
@@ -50,8 +56,9 @@ void main() {
       final useCase = AskQuestionUseCase(
         ragRepository: _FakeRagRepository([_networkResult]),
         llmService: _FakeLlmService(
-          Stream<String>.fromIterable(['Check ', 'Wi-Fi. ']),
+          () => Stream<String>.fromIterable(['Check ', 'Wi-Fi. ']),
         ),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
       );
 
       final streamed = await useCase
@@ -71,10 +78,11 @@ void main() {
   );
 
   test('returns a controlled response when retrieval is empty', () async {
-    final llmService = _FakeLlmService(const Stream.empty());
+    final llmService = _FakeLlmService(Stream<String>.empty);
     final useCase = AskQuestionUseCase(
       ragRepository: _FakeRagRepository(const []),
       llmService: llmService,
+      intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
     );
 
     final result = await useCase('What is the capital of France?');
@@ -89,35 +97,34 @@ void main() {
   });
 
   test(
-    'answers casual messages without searching the knowledge base',
+    'routes chat messages to conversational generation without searching knowledge',
     () async {
-      final cases = {
-        'Hi': 'Hi! How can I help you today?',
-        'Hello there': 'Hi! How can I help you today?',
-        'HEY!': 'Hi! How can I help you today?',
-        'Good morning': 'Hi! How can I help you today?',
-        'How are you?':
-            "I'm doing well and ready to help with your technical questions.",
-        'What’s up?':
-            "I'm doing well and ready to help with your technical questions.",
-        'Thanks!': "You're welcome!",
-        'You’re helpful': "You're welcome!",
-      };
+      final ragRepository = _FakeRagRepository([_networkResult]);
+      final llmService = _FakeLlmService(
+        () => Stream<String>.fromIterable(['Hello', ' there. ']),
+      );
+      final promptBuilder = _RecordingConversationalPromptBuilder();
+      final useCase = AskQuestionUseCase(
+        ragRepository: ragRepository,
+        llmService: llmService,
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
+        conversationalPromptBuilder: promptBuilder,
+      );
 
-      for (final entry in cases.entries) {
-        final ragRepository = _FakeRagRepository([_networkResult]);
-        final useCase = AskQuestionUseCase(
-          ragRepository: ragRepository,
-          llmService: _FakeLlmService(const Stream.empty()),
-        );
+      final streamed = await useCase.stream('Hi there').toList();
+      final completed = await useCase('Hi there');
 
-        final result = await useCase(entry.key);
-
-        expect(result.status, QuestionAnswerStatus.answered);
-        expect(result.answer, entry.value);
-        expect(result.documents, isEmpty);
-        expect(ragRepository.query, isNull);
-      }
+      expect(ragRepository.query, isNull);
+      expect(promptBuilder.message, 'Hi there');
+      expect(llmService.prompt, 'chat:Hi there');
+      expect(streamed.map((answer) => answer.answer), [
+        'Hello',
+        'Hello there. ',
+        'Hello there.',
+      ]);
+      expect(completed.status, QuestionAnswerStatus.answered);
+      expect(completed.documents, isEmpty);
+      expect(completed.answer, 'Hello there.');
     },
   );
 
@@ -135,10 +142,11 @@ void main() {
           similarity: 0.99,
         ),
       ]);
-      final llmService = _FakeLlmService(const Stream.empty());
+      final llmService = _FakeLlmService(Stream<String>.empty);
       final useCase = AskQuestionUseCase(
         ragRepository: ragRepository,
         llmService: llmService,
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
       );
 
       for (final question in [
@@ -160,7 +168,8 @@ void main() {
   test('uses the configured unsupported-question message', () async {
     final useCase = AskQuestionUseCase(
       ragRepository: _FakeRagRepository(const []),
-      llmService: _FakeLlmService(const Stream.empty()),
+      llmService: _FakeLlmService(Stream<String>.empty),
+      intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
       responseConfiguration: const ChatResponseConfiguration(
         unsupportedQuestionMessage: 'Custom fallback',
       ),
@@ -174,7 +183,8 @@ void main() {
   test('returns a controlled response when retrieval fails', () async {
     final useCase = AskQuestionUseCase(
       ragRepository: _ThrowingRagRepository(),
-      llmService: _FakeLlmService(const Stream.empty()),
+      llmService: _FakeLlmService(Stream<String>.empty),
+      intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
     );
 
     final result = await useCase(
@@ -187,15 +197,16 @@ void main() {
   test('returns a controlled response when local generation fails', () async {
     final useCase = AskQuestionUseCase(
       ragRepository: _FakeRagRepository([_networkResult]),
-      llmService: _FakeLlmService(Stream.error(Exception('generation failed'))),
+      llmService: _FakeLlmService(
+        () => Stream<String>.error(Exception('generation failed')),
+      ),
+      intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
     );
 
-    final result = await useCase(
-      'Why can my device not connect to the network?',
-    );
+    final result = await useCase('Hi there');
 
     expect(result.status, QuestionAnswerStatus.generationFailure);
-    expect(result.documents.single.id, 'error-e123');
+    expect(result.documents, isEmpty);
   });
 
   test(
@@ -204,8 +215,9 @@ void main() {
       final useCase = AskQuestionUseCase(
         ragRepository: _FakeRagRepository([_networkResult]),
         llmService: _FakeLlmService(
-          Stream.error(StateError('No active model')),
+          () => Stream<String>.error(StateError('No active model')),
         ),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
       );
 
       final result = await useCase(
@@ -230,6 +242,15 @@ const _networkResult = RagSearchResult(
   ),
   similarity: 0.95,
 );
+
+class _FixedChatIntentRouter implements ChatIntentRouter {
+  const _FixedChatIntentRouter(this.routeValue);
+
+  final ChatRoute routeValue;
+
+  @override
+  Future<ChatRoute> route(String message) async => routeValue;
+}
 
 class _FakeRagRepository implements RagRepository {
   _FakeRagRepository(this.results);
@@ -274,9 +295,9 @@ class _ThrowingRagRepository implements RagRepository {
 }
 
 class _FakeLlmService implements LocalLlmService {
-  _FakeLlmService(this.response);
+  _FakeLlmService(this._responses);
 
-  final Stream<String> response;
+  final Stream<String> Function() _responses;
   String? prompt;
 
   @override
@@ -285,7 +306,7 @@ class _FakeLlmService implements LocalLlmService {
   @override
   Stream<String> generate(String prompt) {
     this.prompt = prompt;
-    return response;
+    return _responses();
   }
 
   @override
@@ -309,5 +330,16 @@ class _RecordingPromptBuilder extends RagPromptBuilder {
   String build({required String question, required String context}) {
     this.question = question;
     return 'prompt:$context';
+  }
+}
+
+class _RecordingConversationalPromptBuilder
+    extends ConversationalPromptBuilder {
+  String? message;
+
+  @override
+  String build(String message) {
+    this.message = message;
+    return 'chat:$message';
   }
 }
