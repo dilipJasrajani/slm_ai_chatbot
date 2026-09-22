@@ -172,4 +172,54 @@ void main() {
       expect(output, isNot(contains('thought')));
     },
   );
+
+  test('suppresses think-tag content from ordinary output', () async {
+    final output = await parser
+        .parse(
+          Stream.fromIterable([
+            '<think>Internal reasoning.</think>',
+            'The device needs a network connection.',
+          ]),
+        )
+        .join();
+
+    expect(output, 'The device needs a network connection.');
+    expect(output, isNot(contains('Internal reasoning')));
+    expect(output, isNot(contains('<think>')));
+  });
+
+  test('suppresses think tags split across streamed chunks', () async {
+    final output = await parser
+        .parse(
+          Stream.fromIterable([
+            '<thi',
+            'nk>Internal',
+            ' reasoning</th',
+            'ink>Visible answer',
+          ]),
+        )
+        .join();
+
+    expect(output, 'Visible answer');
+    expect(output, isNot(contains('Internal')));
+    expect(output, isNot(contains('<think>')));
+    expect(output, isNot(contains('</think>')));
+  });
+
+  test('suppresses unclosed think-tag content', () async {
+    final output = await parser
+        .parse(Stream.value('<think>Internal reasoning only.'))
+        .join();
+
+    expect(output, isEmpty);
+  });
+
+  test('suppresses end-of-text tokens split across streamed chunks', () async {
+    final output = await parser
+        .parse(Stream.fromIterable(['<|endo', 'ftext|>', "I'm here to help!"]))
+        .join();
+
+    expect(output, "I'm here to help!");
+    expect(output, isNot(contains('<|endoftext|>')));
+  });
 }

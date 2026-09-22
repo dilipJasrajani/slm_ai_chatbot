@@ -10,7 +10,8 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
 
   // The current local model configuration remains isolated in this
   // infrastructure implementation.
-  static const modelFileName = 'Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm';
+  // static const modelFileName = 'Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm';
+  static const modelFileName = 'Qwen3-0.6B.litertlm';
   static const _qwen3ModelUrl =
       'https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/'
       '$modelFileName';

@@ -20,6 +20,7 @@ class Qwen3OutputChannelParser {
   ];
 
   Stream<String> parse(Stream<String> rawOutput) async* {
+    rawOutput = _withoutEndOfTextTokens(_withoutThinkTags(rawOutput));
     var channel = _OutputChannel.undecided;
     var buffer = '';
     var terminalRouteCandidate = '';
@@ -158,6 +159,87 @@ class Qwen3OutputChannelParser {
       index++;
     }
     return containsLineBreak ? index : -1;
+  }
+
+  Stream<String> _withoutThinkTags(Stream<String> rawOutput) async* {
+    const openingTag = '<think>';
+    const closingTag = '</think>';
+    var buffer = '';
+    var insideThinkTag = false;
+
+    await for (final chunk in rawOutput) {
+      buffer += chunk;
+
+      while (buffer.isNotEmpty) {
+        if (insideThinkTag) {
+          final closingTagIndex = buffer.indexOf(closingTag);
+          if (closingTagIndex != -1) {
+            buffer = buffer.substring(closingTagIndex + closingTag.length);
+            insideThinkTag = false;
+            continue;
+          }
+          buffer = _tagPrefixSuffix(buffer, closingTag);
+          break;
+        }
+
+        final openingTagIndex = buffer.indexOf(openingTag);
+        if (openingTagIndex != -1) {
+          if (openingTagIndex > 0) {
+            yield buffer.substring(0, openingTagIndex);
+          }
+          buffer = buffer.substring(openingTagIndex + openingTag.length);
+          insideThinkTag = true;
+          continue;
+        }
+
+        final suffix = _tagPrefixSuffix(buffer, openingTag);
+        final contentLength = buffer.length - suffix.length;
+        if (contentLength > 0) {
+          yield buffer.substring(0, contentLength);
+        }
+        buffer = suffix;
+        break;
+      }
+    }
+  }
+
+  String _tagPrefixSuffix(String value, String tag) {
+    final maximumLength = value.length < tag.length ? value.length : tag.length;
+    for (var length = maximumLength; length > 0; length--) {
+      final suffix = value.substring(value.length - length);
+      if (tag.startsWith(suffix)) {
+        return suffix;
+      }
+    }
+    return '';
+  }
+
+  Stream<String> _withoutEndOfTextTokens(Stream<String> rawOutput) async* {
+    const token = '<|endoftext|>';
+    var buffer = '';
+
+    await for (final chunk in rawOutput) {
+      buffer += chunk;
+
+      while (buffer.isNotEmpty) {
+        final tokenIndex = buffer.indexOf(token);
+        if (tokenIndex != -1) {
+          if (tokenIndex > 0) {
+            yield buffer.substring(0, tokenIndex);
+          }
+          buffer = buffer.substring(tokenIndex + token.length);
+          continue;
+        }
+
+        final suffix = _tagPrefixSuffix(buffer, token);
+        final contentLength = buffer.length - suffix.length;
+        if (contentLength > 0) {
+          yield buffer.substring(0, contentLength);
+        }
+        buffer = suffix;
+        break;
+      }
+    }
   }
 }
 
