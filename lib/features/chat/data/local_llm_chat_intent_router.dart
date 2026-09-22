@@ -7,6 +7,7 @@ import '../domain/chat_route_parser.dart';
 import '../domain/conversation_message.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 
+/// Uses the local LLM and existing routing prompt to classify a user request.
 class LocalLlmChatIntentRouter implements HistoryAwareChatIntentRouter {
   LocalLlmChatIntentRouter({
     required LocalLlmService llmService,

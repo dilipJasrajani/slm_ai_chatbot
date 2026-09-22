@@ -36,6 +36,7 @@ class QuestionAnswer {
   final List<KnowledgeDocument> documents;
 }
 
+/// Orchestrates one user question from routing through streaming and history.
 class AskQuestionUseCase {
   AskQuestionUseCase({
     required RagRepository ragRepository,

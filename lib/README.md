@@ -43,6 +43,49 @@ feature dependencies, and starts the Flutter app.
 8. Each streamed answer is returned to `ChatController`, which updates the
    assistant message displayed by `AiChatPage`.
 
+## AI request flow
+
+```text
+User
+ ↓
+ChatController
+ ↓
+AskQuestionUseCase
+ ↓
+ChatIntentRouter
+ ├── CHAT
+ │    ↓
+ │   ConversationalPromptBuilder
+ │    ↓
+ │   LocalLlmService
+ │    ↓
+ │   Qwen3
+ │
+ └── KNOWLEDGE
+      ↓
+   RetrievalQueryBuilder
+      ↓
+   RagRepository
+      ↓
+   EmbeddingGemma + SQLite vector search
+      ↓
+   RetrievedKnowledgeRelevance
+      ↓
+   DocumentContextBuilder
+      ↓
+   RagPromptBuilder
+      ↓
+   LocalLlmService
+      ↓
+   Qwen3
+```
+
+`ChatController` turns the UI event and streamed answer into presentation
+state. `AskQuestionUseCase` is the route-first orchestration point: both
+branches use the generic local LLM service, while only the KNOWLEDGE branch
+retrieves and grounds context. A successful completed answer is added to
+short-term conversation history before the final UI state is shown.
+
 ## Local AI and model lifecycle
 
 ### LLM generation
