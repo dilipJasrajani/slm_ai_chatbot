@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_gemma/flutter_gemma.dart';
 
+import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import '../domain/knowledge_document.dart';
 import '../domain/rag_document.dart';
 import '../domain/rag_repository.dart';
@@ -59,21 +60,33 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     int topK = 1,
     double threshold = 0.0,
   }) async {
+    final profile = AiLatencyProfile.current;
     await initialize();
     await _prepareEmbeddingModel?.call();
-    final results = await _runtime.searchSimilar(
-      query: query,
-      topK: topK,
-      threshold: threshold,
-    );
-    return results
-        .map(
-          (result) => RagSearchResult(
-            document: _documentFromResult(result),
-            similarity: result.similarity,
-          ),
-        )
-        .toList(growable: false);
+    profile?.mark(AiProfileEvent.embeddingAndVectorSearchStart);
+    final List<FlutterGemmaRagRuntimeResult> results;
+    try {
+      results = await _runtime.searchSimilar(
+        query: query,
+        topK: topK,
+        threshold: threshold,
+      );
+    } finally {
+      profile?.mark(AiProfileEvent.embeddingAndVectorSearchEnd);
+    }
+    profile?.mark(AiProfileEvent.metadataDecodeStart);
+    try {
+      return results
+          .map(
+            (result) => RagSearchResult(
+              document: _documentFromResult(result),
+              similarity: result.similarity,
+            ),
+          )
+          .toList(growable: false);
+    } finally {
+      profile?.mark(AiProfileEvent.metadataDecodeEnd);
+    }
   }
 
   KnowledgeDocument _documentFromResult(FlutterGemmaRagRuntimeResult result) {

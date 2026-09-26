@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_page.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/chat_controller.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/chat_models.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
@@ -14,6 +16,77 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
+  testWidgets('visible assistant text is recorded after the chat frame', (
+    tester,
+  ) async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final response = StreamController<String>();
+    final askQuestion = AskQuestionUseCase(
+      ragRepository: _RagRepository(),
+      llmService: _LlmService(response.stream),
+    );
+    final controller = ChatController(
+      modelManager: modelManager,
+      askQuestion: askQuestion,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiChatPage(
+          modelManager: modelManager,
+          askQuestion: askQuestion,
+          controller: controller,
+        ),
+      ),
+    );
+
+    final sending = controller.send('Need help');
+    final messageId = controller.state.messages.last.id;
+    response.add('First text');
+    await tester.pump();
+
+    expect(find.text('First text'), findsOneWidget);
+    expect(controller.isFirstRenderedTextPending(messageId), isFalse);
+
+    await response.close();
+    await sending;
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
+  testWidgets('first rendered text waits for a frame after streamed text', (
+    tester,
+  ) async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final response = StreamController<String>();
+    final controller = ChatController(
+      modelManager: modelManager,
+      askQuestion: AskQuestionUseCase(
+        ragRepository: _RagRepository(),
+        llmService: _LlmService(response.stream),
+      ),
+    );
+    final sending = controller.send('Need help');
+    final messageId = controller.state.messages.last.id;
+    expect(controller.isFirstRenderedTextPending(messageId), isFalse);
+
+    response.add('First text');
+    await tester.pump();
+    expect(controller.isFirstRenderedTextPending(messageId), isTrue);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.recordFirstRenderedText(messageId);
+    });
+    expect(controller.isFirstRenderedTextPending(messageId), isTrue);
+    await tester.pumpWidget(const SizedBox());
+    expect(controller.isFirstRenderedTextPending(messageId), isFalse);
+    await response.close();
+    await sending;
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
   test('progresses through streamed chunks and a controlled error', () async {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();

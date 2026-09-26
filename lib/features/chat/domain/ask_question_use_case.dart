@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
+import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_intent_router.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_response_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_route.dart';
@@ -109,10 +110,33 @@ class AskQuestionUseCase {
         : isLatestTurn
         ? storedHistory
         : const <ConversationMessage>[];
-    _debugLog('CURRENT:\n$question');
-    _debugLog('HISTORY:\n${_formatHistory(history)}');
-    final route = await _routeQuestion(question, history);
-    _debugLog('ROUTER RESULT:\n${route.label}');
+    final profile = AiLatencyProfile.current;
+    if (profile != null) {
+      profile.historyMessageCount = history.length;
+      profile.historyCharacters = history.isEmpty
+          ? 0
+          : history.fold<int>(
+                  0,
+                  (length, message) =>
+                      length +
+                      message.text.length +
+                      (message.author == ConversationAuthor.user ? 6 : 11),
+                ) +
+                history.length -
+                1;
+      profile.userQueryCharacters = question.length;
+    }
+    _debugLog('questionCharacters=${question.length}');
+    _debugLog('historyMessageCount=${history.length}');
+    profile?.mark(AiProfileEvent.routerStart);
+    final ChatRoute route;
+    try {
+      route = await _routeQuestion(question, history);
+    } finally {
+      profile?.mark(AiProfileEvent.routerEnd);
+    }
+    profile?.route = route.label;
+    _debugLog('route=${route.label}');
     final answers = switch (route) {
       ChatRoute.chat => _handleChatRequest(
         question,
@@ -158,10 +182,14 @@ class AskQuestionUseCase {
     List<ConversationMessage> history,
     void Function(Duration)? onGenerationComplete,
   ) async* {
+    final profile = AiLatencyProfile.current;
+    profile?.mark(AiProfileEvent.promptBuildStart);
     final prompt = _conversationalPromptBuilder.build(
       question,
       history: history,
     );
+    profile?.mark(AiProfileEvent.promptBuildEnd);
+    if (profile != null) profile.chatPromptCharacters = prompt.length;
     _debugLog('FALLBACK:\nfalse');
     yield* _generateResponse(prompt, const [], onGenerationComplete);
   }
@@ -171,12 +199,17 @@ class AskQuestionUseCase {
     List<ConversationMessage> history,
     void Function(Duration)? onGenerationComplete,
   ) async* {
+    final profile = AiLatencyProfile.current;
+    profile?.mark(AiProfileEvent.retrievalQueryStart);
     final retrievalQuery =
         (_retrievalQueryBuilder ?? const RetrievalQueryBuilder()).build(
           question: question,
           history: history,
         );
+    profile?.mark(AiProfileEvent.retrievalQueryEnd);
+    profile?.mark(AiProfileEvent.searchStart);
     final searchResults = await _retrieveKnowledge(retrievalQuery);
+    profile?.mark(AiProfileEvent.searchEnd);
     if (searchResults == null) {
       _debugLog('RETRIEVED:\nsearch failed');
       _debugLog('FALLBACK:\nfalse');
@@ -188,14 +221,16 @@ class AskQuestionUseCase {
       return;
     }
 
+    if (profile != null) profile.retrievedCount = searchResults.length;
+    profile?.mark(AiProfileEvent.groundingStart);
     final documents = _relevance.relevantDocuments(
       question: retrievalQuery,
       results: searchResults,
     );
-    _debugLog('RETRIEVED:\n${_formatSearchResults(searchResults)}');
-    _debugLog(
-      'GROUNDING:\n${documents.isEmpty ? 'no relevant documents' : 'relevant document IDs: ${documents.map((document) => document.id).join(', ')}'}',
-    );
+    profile?.mark(AiProfileEvent.groundingEnd);
+    if (profile != null) profile.groundedCount = documents.length;
+    _debugLog('retrievedCount=${searchResults.length}');
+    _debugLog('groundedCount=${documents.length}');
     if (documents.isEmpty) {
       _debugLog('FALLBACK:\ntrue');
       _debugLog('FINAL GENERATION:\nfalse');
@@ -206,11 +241,18 @@ class AskQuestionUseCase {
       return;
     }
 
+    profile?.mark(AiProfileEvent.contextBuildStart);
+    final context = _contextBuilder.build(documents);
+    profile?.mark(AiProfileEvent.contextBuildEnd);
+    if (profile != null) profile.retrievedContextCharacters = context.length;
+    profile?.mark(AiProfileEvent.promptBuildStart);
     final prompt = _promptBuilder.build(
       question: question,
-      context: _contextBuilder.build(documents),
+      context: context,
       history: history,
     );
+    profile?.mark(AiProfileEvent.promptBuildEnd);
+    if (profile != null) profile.ragPromptCharacters = prompt.length;
     _debugLog('FALLBACK:\nfalse');
     yield* _generateResponse(prompt, documents, onGenerationComplete);
   }
@@ -219,26 +261,6 @@ class AskQuestionUseCase {
     if (kDebugMode) {
       debugPrint('[Chat] $message');
     }
-  }
-
-  String _formatHistory(List<ConversationMessage> history) {
-    if (history.isEmpty) return '(empty)';
-    return history
-        .map(
-          (message) =>
-              '${message.author == ConversationAuthor.user ? 'User' : 'Assistant'}: ${message.text}',
-        )
-        .join('\n');
-  }
-
-  String _formatSearchResults(List<RagSearchResult> results) {
-    if (results.isEmpty) return '(none)';
-    return results
-        .map(
-          (result) =>
-              '${result.document.id} | ${result.document.title} | score: ${result.similarity}',
-        )
-        .join('\n');
   }
 
   Future<ChatRoute> _routeQuestion(
@@ -261,9 +283,12 @@ class AskQuestionUseCase {
     void Function(Duration)? onGenerationComplete,
   ) async* {
     Duration? completedDuration;
+    final profile = AiLatencyProfile.current;
     try {
       _debugLog('FINAL GENERATION:\ntrue');
       final response = StringBuffer();
+      profile?.generationPhase = AiGenerationPhase.finalAnswer;
+      profile?.mark(AiProfileEvent.finalLlmStart);
       final stopwatch = Stopwatch()..start();
       await for (final chunk in _llmService.generate(prompt)) {
         response.write(chunk);
@@ -274,6 +299,7 @@ class AskQuestionUseCase {
         );
       }
       stopwatch.stop();
+      profile?.mark(AiProfileEvent.finalLlmEnd);
       final answer = response.toString().trim();
       if (answer.isEmpty) {
         yield QuestionAnswer(
@@ -303,6 +329,8 @@ class AskQuestionUseCase {
         answer: 'Unable to generate an answer with the local AI model.',
         documents: documents,
       );
+    } finally {
+      profile?.mark(AiProfileEvent.finalLlmEnd);
     }
     if (completedDuration != null) {
       onGenerationComplete?.call(completedDuration);
@@ -311,7 +339,7 @@ class AskQuestionUseCase {
 
   Future<List<RagSearchResult>?> _retrieveKnowledge(String question) async {
     try {
-      _debugLog('RAG QUERY:\n$question');
+      _debugLog('retrievalQueryCharacters=${question.length}');
       return await _ragRepository.search(query: question, topK: 3);
     } catch (_) {
       return null;

@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/rendering.dart'
+    show MatrixUtils, RenderAbstractViewport;
 
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/evaluation/domain/chat_intent_evaluation_runner.dart';
@@ -51,6 +53,8 @@ class _AiChatPageState extends State<AiChatPage> {
   final _scrollController = ScrollController();
   final _messageWidgets = <String, _ChatBubble>{};
   final _seenMessages = <String>{};
+  final _pendingVisibleItems =
+      <String, ({int request, BuildContext context})>{};
   AiChatTheme? _resolvedTheme;
   AiChatTheme? _themeSource;
   ColorScheme? _themeColorScheme;
@@ -87,6 +91,7 @@ class _AiChatPageState extends State<AiChatPage> {
 
   @override
   void dispose() {
+    _pendingVisibleItems.clear();
     _controller.removeListener(_onStateChanged);
     if (_ownsController) _controller.dispose();
     _composerController.dispose();
@@ -99,6 +104,13 @@ class _AiChatPageState extends State<AiChatPage> {
     _shouldAutoScroll =
         _scrollController.position.extentAfter <=
         widget.configuration.scrollThreshold;
+    for (final entry in _pendingVisibleItems.entries) {
+      _checkVisibleAfterFrame(
+        entry.key,
+        entry.value.request,
+        entry.value.context,
+      );
+    }
   }
 
   @override
@@ -118,6 +130,7 @@ class _AiChatPageState extends State<AiChatPage> {
     if (_controller.state.messages.isEmpty) {
       _messageWidgets.clear();
       _seenMessages.clear();
+      _pendingVisibleItems.clear();
     }
     setState(() {});
     _scheduleScroll();
@@ -128,11 +141,14 @@ class _AiChatPageState extends State<AiChatPage> {
     _scrollScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollScheduled = false;
-      if (!mounted ||
-          !_scrollController.hasClients ||
-          (!_shouldAutoScroll && !force)) {
+      if (!mounted || !_scrollController.hasClients) {
         return;
       }
+      if (!_shouldAutoScroll && !force) {
+        _checkPendingVisibleText();
+        return;
+      }
+      final previousOffset = _scrollController.position.pixels;
       final target = _scrollController.position.maxScrollExtent;
       if (_controller.state.isTyping ||
           MediaQuery.disableAnimationsOf(context) ||
@@ -145,10 +161,94 @@ class _AiChatPageState extends State<AiChatPage> {
           curve: Curves.easeOut,
         );
       }
+      if (_scrollController.position.pixels == previousOffset) {
+        _checkPendingVisibleText();
+      }
     });
   }
 
+  void _checkPendingVisibleText() {
+    for (final entry in _pendingVisibleItems.entries.toList(growable: false)) {
+      _recordVisibleTextIfPainted(
+        entry.key,
+        entry.value.request,
+        entry.value.context,
+      );
+    }
+  }
+
+  void _checkVisibleAfterFrame(
+    String messageId,
+    int requestNumber,
+    BuildContext contentContext,
+  ) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recordVisibleTextIfPainted(messageId, requestNumber, contentContext);
+    });
+  }
+
+  void _recordVisibleTextIfPainted(
+    String messageId,
+    int requestNumber,
+    BuildContext contentContext,
+  ) {
+    if (!mounted) return;
+    final pending = _pendingVisibleItems[messageId];
+    if (pending?.request != requestNumber ||
+        pending?.context != contentContext) {
+      return;
+    }
+    if (!contentContext.mounted) {
+      _pendingVisibleItems.remove(messageId);
+      return;
+    }
+    final content = contentContext.findRenderObject();
+    if (content is! RenderBox || !content.attached || !content.hasSize) return;
+    final viewport = switch (RenderAbstractViewport.of(content)) {
+      RenderBox box => box,
+      _ => null,
+    };
+    if (viewport == null || !viewport.attached || !viewport.hasSize) return;
+    final contentBounds = MatrixUtils.transformRect(
+      content.getTransformTo(viewport),
+      Offset.zero & content.size,
+    );
+    if (!(Offset.zero & viewport.size).overlaps(contentBounds)) return;
+    _controller.recordFirstRenderedText(
+      messageId,
+      requestNumber: requestNumber,
+    );
+    _pendingVisibleItems.remove(messageId);
+  }
+
+  void _watchFirstVisibleText(
+    String messageId,
+    int requestNumber,
+    BuildContext contentContext,
+  ) {
+    if (_controller.pendingRenderedRequestNumber(messageId) != requestNumber) {
+      return;
+    }
+    _pendingVisibleItems[messageId] = (
+      request: requestNumber,
+      context: contentContext,
+    );
+    // The existing auto-scroll can run after this frame; observe the next one.
+    if (_scrollScheduled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && contentContext.mounted) {
+          _checkVisibleAfterFrame(messageId, requestNumber, contentContext);
+        }
+      });
+    } else {
+      _checkVisibleAfterFrame(messageId, requestNumber, contentContext);
+    }
+  }
+
   Widget _messageAt(ChatMessage message, {required bool isLatestAssistant}) {
+    final pendingRequestNumber = _controller.pendingRenderedRequestNumber(
+      message.id,
+    );
     final showRegenerateAction =
         widget.configuration.showRegenerateAction && isLatestAssistant;
     final existing = _messageWidgets[message.id];
@@ -189,6 +289,16 @@ class _AiChatPageState extends State<AiChatPage> {
       assistantAvatar: widget.configuration.assistantAvatar,
       sourceSectionLabel: widget.configuration.sourceSectionLabel,
       seenMessages: _seenMessages,
+      onFirstVisibleText:
+          pendingRequestNumber == null ||
+              message.author != ChatAuthor.assistant ||
+              message.text.trim().isEmpty
+          ? null
+          : (contentContext) => _watchFirstVisibleText(
+              message.id,
+              pendingRequestNumber,
+              contentContext,
+            ),
       onRetry: () => _retry(message),
       onRegenerate: () => _regenerate(message),
     );
@@ -623,6 +733,7 @@ class _ChatBubble extends StatelessWidget {
     required this.assistantAvatar,
     required this.sourceSectionLabel,
     required this.seenMessages,
+    this.onFirstVisibleText,
     required this.onRetry,
     required this.onRegenerate,
     super.key,
@@ -642,6 +753,7 @@ class _ChatBubble extends StatelessWidget {
   final ImageProvider? assistantAvatar;
   final String sourceSectionLabel;
   final Set<String> seenMessages;
+  final void Function(BuildContext)? onFirstVisibleText;
   final VoidCallback onRetry;
   final VoidCallback onRegenerate;
 
@@ -674,6 +786,19 @@ class _ChatBubble extends StatelessWidget {
         !message.isStreaming &&
         message.isError &&
         message.text.isNotEmpty;
+    final messageContent = message.isStreaming && message.text.isEmpty
+        ? _TypingIndicator(theme: theme)
+        : !isUser &&
+              !message.isStreaming &&
+              !message.isError &&
+              message.text.isNotEmpty
+        ? AssistantContent(text: message.text, theme: theme)
+        : Text(
+            message.text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: textColor, height: 1.4),
+          );
     final content = Padding(
       padding: EdgeInsets.only(bottom: theme.spacing * .75),
       child: Row(
@@ -714,17 +839,13 @@ class _ChatBubble extends StatelessWidget {
                             : theme.borderColor,
                       ),
                     ),
-                    child: message.isStreaming && message.text.isEmpty
-                        ? _TypingIndicator(theme: theme)
-                        : !isUser &&
-                              !message.isStreaming &&
-                              !message.isError &&
-                              message.text.isNotEmpty
-                        ? AssistantContent(text: message.text, theme: theme)
-                        : Text(
-                            message.text,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: textColor, height: 1.4),
+                    child: onFirstVisibleText == null
+                        ? messageContent
+                        : Builder(
+                            builder: (contentContext) {
+                              onFirstVisibleText!(contentContext);
+                              return messageContent;
+                            },
                           ),
                   ),
                 ),

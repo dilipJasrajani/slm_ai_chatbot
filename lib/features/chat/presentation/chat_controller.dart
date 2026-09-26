@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
@@ -36,6 +37,8 @@ class ChatController extends ChangeNotifier {
   late final StreamSubscription<ModelState> _modelSubscription;
   ChatState _state;
   var _messageSequence = 0;
+  var _requestSequence = 0;
+  final _pendingRenderedProfiles = <String, AiLatencyProfile>{};
   var _disposed = false;
 
   ChatState get state => _state;
@@ -116,8 +119,31 @@ class ChatController extends ChangeNotifier {
     ChatMessage? previousAnswer,
     ChatMessage? retryingAnswer,
     bool isLatestTurn = false,
+  }) {
+    final profile = kDebugMode
+        ? AiLatencyProfile(requestNumber: ++_requestSequence)
+        : null;
+    return AiLatencyProfile.run(
+      profile,
+      () => _runQuestionWithProfile(
+        question,
+        previousAnswer: previousAnswer,
+        retryingAnswer: retryingAnswer,
+        isLatestTurn: isLatestTurn,
+        profile: profile,
+      ),
+    );
+  }
+
+  Future<String?> _runQuestionWithProfile(
+    String question, {
+    required AiLatencyProfile? profile,
+    ChatMessage? previousAnswer,
+    ChatMessage? retryingAnswer,
+    bool isLatestTurn = false,
   }) async {
     final assistantId = (previousAnswer ?? retryingAnswer)?.id ?? _nextId();
+    if (profile != null) _pendingRenderedProfiles[assistantId] = profile;
     final streamingAnswer = ChatMessage(
       id: assistantId,
       author: ChatAuthor.assistant,
@@ -180,6 +206,9 @@ class ChatController extends ChangeNotifier {
           isStreaming: true,
           isError: isError,
         );
+        if (answer.answer.trim().isNotEmpty) {
+          profile?.mark(AiProfileEvent.firstPresentationText);
+        }
       }
       completed = true;
     } finally {
@@ -210,6 +239,9 @@ class ChatController extends ChangeNotifier {
         }
         _setState(state.copyWith(isTyping: false));
       }
+      profile?.complete(
+        _disposed ? 'cancelled' : lastAnswer?.status.name ?? 'interrupted',
+      );
     }
     return regenerationError;
   }
@@ -233,7 +265,26 @@ class ChatController extends ChangeNotifier {
   void clearHistory() {
     if (state.isTyping) return;
     _askQuestion.clearHistory();
+    _pendingRenderedProfiles.clear();
     _setState(state.copyWith(messages: const []));
+  }
+
+  bool isFirstRenderedTextPending(String messageId) =>
+      _pendingRenderedProfiles[messageId]?.isFirstRenderedTextPending ?? false;
+
+  int? pendingRenderedRequestNumber(String messageId) {
+    final profile = _pendingRenderedProfiles[messageId];
+    return profile?.isFirstRenderedTextPending ?? false
+        ? profile!.requestNumber
+        : null;
+  }
+
+  void recordFirstRenderedText(String messageId, {int? requestNumber}) {
+    final profile = _pendingRenderedProfiles[messageId];
+    if (requestNumber != null && profile?.requestNumber != requestNumber) {
+      return;
+    }
+    _pendingRenderedProfiles.remove(messageId)?.recordFirstRenderedText();
   }
 
   void _onModelState(ModelState modelState) {
@@ -278,6 +329,7 @@ class ChatController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _pendingRenderedProfiles.clear();
     unawaited(_modelSubscription.cancel());
     unawaited(_askQuestion.cancel());
     super.dispose();
