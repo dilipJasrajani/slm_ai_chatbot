@@ -235,6 +235,61 @@ and avatar styling; `AiChatConfiguration` contains chat text and behavior
 configuration. `chat_models.dart` contains only transient `ChatMessage` and
 `ChatState` presentation models.
 
+The composer displays the configured local model label and, when available,
+the initialized inference model's selected runtime backend. After local
+generation finishes, each successful assistant message can show its generation
+time. Grounded answer documents already returned by `AskQuestionUseCase` appear
+as compact source codes and titles, without another retrieval or exposing
+document content.
+
+`AiChatConfiguration` also provides `assistantName` and an optional
+`assistantAvatar` (`ImageProvider`, such as an `AssetImage` declared by the host
+app). Without an image, the existing theme icon is used. `welcomeTitle`,
+`welcomeMessage` (description), and `suggestions` customize the empty state.
+Suggestions use the same composer send action as typed questions; the welcome
+view returns whenever the conversation has no messages.
+
+Pass `chatTheme: const AiChatTheme(primaryColor: Colors.teal, ...)` to `MyApp`
+or directly to `AiChatPage` to customize the accent and optionally the
+`assistantBubbleColor`, `assistantTextColor`, `userBubbleColor`, and
+`userTextColor`. The primary color also styles the send button, focused
+composer, and assistant avatar; `accentColor` styles suggested-prompt outlines.
+Unspecified bubble text colors are selected for contrast. The existing light
+palette remains the default; in a dark host `ThemeData`, unspecified colors
+come from its `ColorScheme`. Typography inherits the host `TextTheme` (including
+its font family). Other surfaces, borders, and spacing remain available through
+the existing `AiChatTheme` without adding configuration fields.
+
+Completed, non-error assistant responses show a compact Copy action that copies
+only the response text (not timing or sources) and briefly confirms success.
+Set `AiChatConfiguration(showCopyAction: false)` to hide it.
+
+Completed assistant answers render Markdown paragraphs, headings, lists, inline
+code, and fenced code blocks. Code blocks scroll horizontally and offer a
+separate Copy action for only that block's raw code; response Copy still copies
+the exact original answer, including Markdown syntax. Partial streamed answers,
+user messages, and errors keep their plain-text presentation. Markdown images
+show alt text rather than loading remote resources, keeping chat offline.
+
+Only the latest completed, non-error assistant response offers Regenerate
+(`showRegenerateAction: false` hides it); earlier responses can still be copied.
+This reuses the original question and local CHAT/KNOWLEDGE flow, streams into
+the same bubble, and replaces the prior answer in recent conversation history
+rather than adding a turn. On failure the prior response is kept and the
+existing error text is shown.
+
+Failed requests keep their user question and show a compact Retry action
+(`showRetryAction: false` hides Retry controls). Retrying reuses the existing
+CHAT/KNOWLEDGE pipeline and streams into the same assistant bubble without
+adding another user message or a failed turn to conversation history. A
+successful retry gets its normal sources, generation time, Copy, Regenerate,
+and Markdown presentation. Retrying an older failure records the recovered
+turn when the retry completes; existing successful turns are not rewritten.
+Local model loading errors show a concise message
+and offer a separate retry using the existing model manager. Knowledge
+preparation failures show restart guidance; the underlying initialization
+may cache a failure until the app restarts.
+
 ## Folder responsibilities
 
 `features/chat` contains conversation behavior, CHAT/KNOWLEDGE routing,

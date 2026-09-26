@@ -24,6 +24,48 @@ void main() {
     expect(history.messages, isEmpty);
   });
 
+  test(
+    'replaces only the identified assistant turn and can remove a fallback',
+    () {
+      final history = InMemoryConversationHistory();
+      history.addAll(const [
+        ConversationMessage(
+          author: ConversationAuthor.user,
+          text: 'Same question',
+          turnId: 'first',
+        ),
+        ConversationMessage(
+          author: ConversationAuthor.assistant,
+          text: 'Same answer',
+          turnId: 'first',
+        ),
+        ConversationMessage(
+          author: ConversationAuthor.user,
+          text: 'Same question',
+          turnId: 'second',
+        ),
+        ConversationMessage(
+          author: ConversationAuthor.assistant,
+          text: 'Same answer',
+          turnId: 'second',
+        ),
+      ]);
+      history.replaceTurn('first', 'Updated answer');
+      expect(history.messages.map((message) => message.text), [
+        'Same question',
+        'Updated answer',
+        'Same question',
+        'Same answer',
+      ]);
+      history.replaceTurn('second', null);
+      expect(history.messages.map((message) => message.text), [
+        'Same question',
+        'Updated answer',
+      ]);
+      expect(() => history.replaceTurn('second', 'Missing'), throwsStateError);
+    },
+  );
+
   test('router prompt includes delimited conversation history', () {
     final prompt = const ChatIntentRoutingPromptBuilder().build(
       'What about that error?',

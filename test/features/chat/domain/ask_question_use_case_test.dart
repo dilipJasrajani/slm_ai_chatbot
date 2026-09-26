@@ -87,8 +87,16 @@ void main() {
         intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
       );
 
+      Duration? generationDuration;
+      var completionCount = 0;
       final streamed = await useCase
-          .stream('Why can my device not connect to the network?')
+          .stream(
+            'Why can my device not connect to the network?',
+            onGenerationComplete: (duration) {
+              generationDuration = duration;
+              completionCount++;
+            },
+          )
           .toList();
       final completed = await useCase(
         'Why can my device not connect to the network?',
@@ -100,8 +108,48 @@ void main() {
         'Check Wi-Fi.',
       ]);
       expect(completed.answer, 'Check Wi-Fi.');
+      expect(completionCount, 1);
+      expect(generationDuration, isNotNull);
+      expect(generationDuration, greaterThanOrEqualTo(Duration.zero));
     },
   );
+
+  test('records completion without adding a duplicate answer event', () async {
+    final useCase = AskQuestionUseCase(
+      ragRepository: _FakeRagRepository([_networkResult]),
+      llmService: _FakeLlmService(() => Stream.value('Done.')),
+      intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
+    );
+    Duration? generationDuration;
+
+    final answers = await useCase
+        .stream(
+          'Hi',
+          onGenerationComplete: (duration) => generationDuration = duration,
+        )
+        .toList();
+
+    expect(answers.map((answer) => answer.answer), ['Done.']);
+    expect(generationDuration, isNotNull);
+  });
+
+  test('does not report generation duration for failed generation', () async {
+    final useCase = AskQuestionUseCase(
+      ragRepository: _FakeRagRepository([_networkResult]),
+      llmService: _FakeLlmService(
+        () => Stream<String>.error(StateError('Generation failed')),
+      ),
+      intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
+    );
+    var completionCount = 0;
+
+    final answers = await useCase
+        .stream('Hi', onGenerationComplete: (_) => completionCount++)
+        .toList();
+
+    expect(answers.single.status, QuestionAnswerStatus.modelUnavailable);
+    expect(completionCount, 0);
+  });
 
   test('returns a controlled response when retrieval is empty', () async {
     final llmService = _FakeLlmService(Stream<String>.empty);
@@ -111,7 +159,13 @@ void main() {
       intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
     );
 
-    final result = await useCase('What is the capital of France?');
+    var completionCount = 0;
+    final result = await useCase
+        .stream(
+          'What is the capital of France?',
+          onGenerationComplete: (_) => completionCount++,
+        )
+        .last;
 
     expect(result.status, QuestionAnswerStatus.noRelevantKnowledge);
     expect(
@@ -120,6 +174,7 @@ void main() {
       "available in my knowledge base. I can't answer that question.",
     );
     expect(llmService.prompt, isNull);
+    expect(completionCount, 0);
   });
 
   test(
@@ -354,6 +409,205 @@ User: How can I fix it?''');
       expect(history.messages, isEmpty);
     },
   );
+
+  test(
+    'regenerates the selected CHAT turn with only preceding history',
+    () async {
+      final history = InMemoryConversationHistory(maxMessages: 8);
+      final router = _HistoryRouter(ChatRoute.chat);
+      var answerNumber = 0;
+      final llm = _FakeLlmService(
+        () => Stream.value('Answer ${++answerNumber}'),
+      );
+      final useCase = AskQuestionUseCase(
+        ragRepository: _FakeRagRepository([_networkResult]),
+        llmService: llm,
+        intentRouter: router,
+        conversationHistory: history,
+      );
+      await useCase.stream('First', turnId: 'one').last;
+      await useCase.stream('Repeated', turnId: 'two').last;
+      await useCase.stream('Repeated', turnId: 'three').last;
+
+      final updated = await useCase
+          .stream('Repeated', turnId: 'two', regenerate: true)
+          .last;
+      expect(updated.answer, 'Answer 4');
+      expect(router.history.map((message) => message.text), [
+        'First',
+        'Answer 1',
+      ]);
+      expect(llm.prompt, contains('Answer 1'));
+      expect(llm.prompt, isNot(contains('Answer 2')));
+      expect(llm.prompt, isNot(contains('Answer 3')));
+      expect(history.messages.map((message) => message.text), [
+        'First',
+        'Answer 1',
+        'Repeated',
+        'Answer 4',
+        'Repeated',
+        'Answer 3',
+      ]);
+    },
+  );
+
+  test(
+    'regenerates KNOWLEDGE using fresh retrieval and replaces history',
+    () async {
+      final history = InMemoryConversationHistory();
+      final router = _HistoryRouter(ChatRoute.knowledge);
+      final repository = _FakeRagRepository([_networkResult]);
+      var answerNumber = 0;
+      final useCase = AskQuestionUseCase(
+        ragRepository: repository,
+        llmService: _FakeLlmService(
+          () => Stream.value('Answer ${++answerNumber}'),
+        ),
+        intentRouter: router,
+        conversationHistory: history,
+      );
+      const question = 'How do I fix E123?';
+      await useCase.stream(question, turnId: 'answer').last;
+      repository.results = const [
+        RagSearchResult(
+          document: KnowledgeDocument(
+            id: 'new-guide',
+            title: 'E123 network guide',
+            content: 'Restart the network connection.',
+            metadata: {'code': 'E123'},
+          ),
+          similarity: 0.99,
+        ),
+      ];
+
+      final updated = await useCase
+          .stream(
+            question,
+            turnId: 'answer',
+            regenerate: true,
+            isLatestTurn: true,
+          )
+          .last;
+      expect(router.history, isEmpty);
+      expect(repository.query, question);
+      expect(updated.documents.single.id, 'new-guide');
+      expect(updated.answer, 'Answer 2');
+      expect(history.messages.map((message) => message.text), [
+        question,
+        'Answer 2',
+      ]);
+    },
+  );
+
+  test(
+    'failed regeneration retains history and successful fallback removes it',
+    () async {
+      final history = InMemoryConversationHistory();
+      final repository = _FakeRagRepository([_networkResult]);
+      final useCase = AskQuestionUseCase(
+        ragRepository: repository,
+        llmService: _FakeLlmService(() => Stream.value('Original')),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
+        conversationHistory: history,
+      );
+      const question = 'How do I fix E123?';
+      await useCase.stream(question, turnId: 'answer').last;
+      repository.results = const [];
+      final fallback = await useCase
+          .stream(
+            question,
+            turnId: 'answer',
+            regenerate: true,
+            isLatestTurn: true,
+          )
+          .last;
+      expect(fallback.status, QuestionAnswerStatus.noRelevantKnowledge);
+      expect(history.messages, isEmpty);
+
+      repository.results = [_networkResult];
+      await useCase.stream(question, turnId: 'answer').last;
+      final failedUseCase = AskQuestionUseCase(
+        ragRepository: repository,
+        llmService: _FakeLlmService(
+          () => Stream<String>.error(StateError('Unavailable')),
+        ),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
+        conversationHistory: history,
+      );
+      final failure = await failedUseCase
+          .stream(
+            question,
+            turnId: 'answer',
+            regenerate: true,
+            isLatestTurn: true,
+          )
+          .last;
+      expect(failure.status, QuestionAnswerStatus.modelUnavailable);
+      expect(history.messages.map((message) => message.text), [
+        question,
+        'Original',
+      ]);
+    },
+  );
+
+  test(
+    'successful regeneration after an unstored fallback adds one turn',
+    () async {
+      final history = InMemoryConversationHistory();
+      final repository = _FakeRagRepository(const []);
+      final useCase = AskQuestionUseCase(
+        ragRepository: repository,
+        llmService: _FakeLlmService(() => Stream.value('Now grounded')),
+        intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
+        conversationHistory: history,
+      );
+      const question = 'How do I fix E123?';
+      final fallback = await useCase.stream(question, turnId: 'answer').last;
+      expect(fallback.status, QuestionAnswerStatus.noRelevantKnowledge);
+      expect(history.messages, isEmpty);
+      repository.results = [_networkResult];
+
+      final updated = await useCase
+          .stream(
+            question,
+            turnId: 'answer',
+            regenerate: true,
+            isLatestTurn: true,
+          )
+          .last;
+      expect(updated.status, QuestionAnswerStatus.answered);
+      expect(history.messages.map((message) => message.text), [
+        question,
+        'Now grounded',
+      ]);
+    },
+  );
+
+  test(
+    'aged-out turn does not pollute recent conversation on regeneration',
+    () async {
+      final history = InMemoryConversationHistory(maxMessages: 2);
+      final router = _HistoryRouter(ChatRoute.chat);
+      var number = 0;
+      final useCase = AskQuestionUseCase(
+        ragRepository: _FakeRagRepository([_networkResult]),
+        llmService: _FakeLlmService(() => Stream.value('Answer ${++number}')),
+        intentRouter: router,
+        conversationHistory: history,
+      );
+      await useCase.stream('Old', turnId: 'old').last;
+      await useCase.stream('New', turnId: 'new').last;
+      final updated = await useCase
+          .stream('Old', turnId: 'old', regenerate: true)
+          .last;
+      expect(updated.answer, 'Answer 3');
+      expect(router.history, isEmpty);
+      expect(history.messages.map((message) => message.text), [
+        'New',
+        'Answer 2',
+      ]);
+    },
+  );
 }
 
 const _networkResult = RagSearchResult(
@@ -397,7 +651,7 @@ class _HistoryRouter implements HistoryAwareChatIntentRouter {
 class _FakeRagRepository implements RagRepository {
   _FakeRagRepository(this.results);
 
-  final List<RagSearchResult> results;
+  List<RagSearchResult> results;
   String? query;
   double? threshold;
 

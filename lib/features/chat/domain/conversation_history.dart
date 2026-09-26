@@ -7,6 +7,8 @@ abstract interface class ConversationHistory {
 
   void addAll(Iterable<ConversationMessage> messages);
 
+  void replaceTurn(String turnId, String? answer);
+
   void clear();
 }
 
@@ -26,6 +28,28 @@ class InMemoryConversationHistory implements ConversationHistory {
     final overflow = _messages.length - maxMessages;
     if (overflow > 0) {
       _messages.removeRange(0, overflow);
+    }
+    _logCount();
+  }
+
+  @override
+  void replaceTurn(String turnId, String? answer) {
+    final assistantIndex = _messages.indexWhere(
+      (message) =>
+          message.turnId == turnId &&
+          message.author == ConversationAuthor.assistant,
+    );
+    if (assistantIndex < 0) {
+      throw StateError('Turn $turnId is not in conversation history.');
+    }
+    if (answer == null) {
+      _messages.removeWhere((message) => message.turnId == turnId);
+    } else {
+      _messages[assistantIndex] = ConversationMessage(
+        author: ConversationAuthor.assistant,
+        text: answer,
+        turnId: turnId,
+      );
     }
     _logCount();
   }

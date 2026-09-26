@@ -86,36 +86,90 @@ class AskQuestionUseCase {
   ///
   /// Retrieval and generation failures are emitted as a single controlled
   /// answer, matching [call].
-  Stream<QuestionAnswer> stream(String question) async* {
-    final history = _conversationHistory.messages;
+  Stream<QuestionAnswer> stream(
+    String question, {
+    void Function(Duration)? onGenerationComplete,
+    String? turnId,
+    bool regenerate = false,
+    bool isLatestTurn = false,
+  }) async* {
+    if (regenerate && turnId == null) {
+      throw ArgumentError.notNull('turnId');
+    }
+    final storedHistory = _conversationHistory.messages;
+    final turnIndex = regenerate
+        ? storedHistory.indexWhere((message) => message.turnId == turnId)
+        : -1;
+    // A regenerated turn must not see its old answer or later turns as context.
+    // Expired older turns have no safe preceding context in the bounded history.
+    final history = !regenerate
+        ? storedHistory
+        : turnIndex >= 0
+        ? storedHistory.sublist(0, turnIndex)
+        : isLatestTurn
+        ? storedHistory
+        : const <ConversationMessage>[];
     _debugLog('CURRENT:\n$question');
     _debugLog('HISTORY:\n${_formatHistory(history)}');
     final route = await _routeQuestion(question, history);
     _debugLog('ROUTER RESULT:\n${route.label}');
-    switch (route) {
-      case ChatRoute.chat:
-        yield* _handleChatRequest(question, history);
-        return;
-      case ChatRoute.knowledge:
-        yield* _handleKnowledgeRequest(question, history);
+    final answers = switch (route) {
+      ChatRoute.chat => _handleChatRequest(
+        question,
+        history,
+        onGenerationComplete,
+      ),
+      ChatRoute.knowledge => _handleKnowledgeRequest(
+        question,
+        history,
+        onGenerationComplete,
+      ),
+    };
+    QuestionAnswer? lastAnswer;
+    await for (final answer in answers) {
+      lastAnswer = answer;
+      yield answer;
+    }
+    if (lastAnswer?.status == QuestionAnswerStatus.answered) {
+      if (turnIndex >= 0) {
+        _conversationHistory.replaceTurn(turnId!, lastAnswer!.answer);
+      } else if (!regenerate || isLatestTurn) {
+        _conversationHistory.addAll([
+          ConversationMessage(
+            author: ConversationAuthor.user,
+            text: question,
+            turnId: turnId,
+          ),
+          ConversationMessage(
+            author: ConversationAuthor.assistant,
+            text: lastAnswer!.answer,
+            turnId: turnId,
+          ),
+        ]);
+      }
+    } else if (turnIndex >= 0 &&
+        lastAnswer?.status == QuestionAnswerStatus.noRelevantKnowledge) {
+      _conversationHistory.replaceTurn(turnId!, null);
     }
   }
 
   Stream<QuestionAnswer> _handleChatRequest(
     String question,
     List<ConversationMessage> history,
+    void Function(Duration)? onGenerationComplete,
   ) async* {
     final prompt = _conversationalPromptBuilder.build(
       question,
       history: history,
     );
     _debugLog('FALLBACK:\nfalse');
-    yield* _generateAndStore(prompt, const [], question);
+    yield* _generateResponse(prompt, const [], onGenerationComplete);
   }
 
   Stream<QuestionAnswer> _handleKnowledgeRequest(
     String question,
     List<ConversationMessage> history,
+    void Function(Duration)? onGenerationComplete,
   ) async* {
     final retrievalQuery =
         (_retrievalQueryBuilder ?? const RetrievalQueryBuilder()).build(
@@ -158,7 +212,7 @@ class AskQuestionUseCase {
       history: history,
     );
     _debugLog('FALLBACK:\nfalse');
-    yield* _generateAndStore(prompt, documents, question);
+    yield* _generateResponse(prompt, documents, onGenerationComplete);
   }
 
   void _debugLog(String message) {
@@ -204,10 +258,13 @@ class AskQuestionUseCase {
   Stream<QuestionAnswer> _generateResponse(
     String prompt,
     List<KnowledgeDocument> documents,
+    void Function(Duration)? onGenerationComplete,
   ) async* {
+    Duration? completedDuration;
     try {
       _debugLog('FINAL GENERATION:\ntrue');
       final response = StringBuffer();
+      final stopwatch = Stopwatch()..start();
       await for (final chunk in _llmService.generate(prompt)) {
         response.write(chunk);
         yield QuestionAnswer(
@@ -216,6 +273,7 @@ class AskQuestionUseCase {
           documents: documents,
         );
       }
+      stopwatch.stop();
       final answer = response.toString().trim();
       if (answer.isEmpty) {
         yield QuestionAnswer(
@@ -225,6 +283,7 @@ class AskQuestionUseCase {
         );
         return;
       }
+      completedDuration = stopwatch.elapsed;
       if (answer != response.toString()) {
         yield QuestionAnswer(
           status: QuestionAnswerStatus.answered,
@@ -245,26 +304,8 @@ class AskQuestionUseCase {
         documents: documents,
       );
     }
-  }
-
-  Stream<QuestionAnswer> _generateAndStore(
-    String prompt,
-    List<KnowledgeDocument> documents,
-    String question,
-  ) async* {
-    QuestionAnswer? completedAnswer;
-    await for (final answer in _generateResponse(prompt, documents)) {
-      completedAnswer = answer;
-      yield answer;
-    }
-    if (completedAnswer?.status == QuestionAnswerStatus.answered) {
-      _conversationHistory.addAll([
-        ConversationMessage(author: ConversationAuthor.user, text: question),
-        ConversationMessage(
-          author: ConversationAuthor.assistant,
-          text: completedAnswer!.answer,
-        ),
-      ]);
+    if (completedDuration != null) {
+      onGenerationComplete?.call(completedDuration);
     }
   }
 

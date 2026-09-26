@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
 import 'chat_models.dart';
 
 /// Converts chat UI events and use-case streams into immutable presentation state.
@@ -48,83 +50,184 @@ class ChatController extends ChangeNotifier {
           clearKnowledgeError: true,
         ),
       );
-    } on StateError {
-      _setState(
-        state.copyWith(
-          isPreparingKnowledge: false,
-          knowledgeReady: false,
-          knowledgeError: 'Local knowledge could not be prepared.',
-        ),
-      );
-    } on FormatException {
-      _setState(
-        state.copyWith(
-          isPreparingKnowledge: false,
-          knowledgeReady: false,
-          knowledgeError: 'Local knowledge could not be prepared.',
-        ),
-      );
+    } on StateError catch (error) {
+      _knowledgePreparationFailed(error);
+    } on FormatException catch (error) {
+      _knowledgePreparationFailed(error);
+    } on PlatformException catch (error) {
+      _knowledgePreparationFailed(error);
+    } on MissingPluginException catch (error) {
+      _knowledgePreparationFailed(error);
+    } on Exception catch (error) {
+      // Local preparation adapters can surface package-specific exceptions.
+      _knowledgePreparationFailed(error);
     }
+  }
+
+  void _knowledgePreparationFailed(Object error) {
+    if (kDebugMode) {
+      debugPrint('[Chat] Local knowledge preparation failed: $error');
+    }
+    _setState(
+      state.copyWith(
+        isPreparingKnowledge: false,
+        knowledgeReady: false,
+        knowledgeError:
+            'Local knowledge could not be prepared. Restart the app to try again.',
+      ),
+    );
+  }
+
+  Future<ModelState> retryModelInitialization() {
+    if (_disposed || state.modelState.status != ModelStatus.error) {
+      throw StateError('The local model is not awaiting retry.');
+    }
+    return _modelManager.ensureReady();
   }
 
   Future<void> send(String value) async {
     final question = value.trim();
     if (question.isEmpty || !state.canSend) return;
+    await _runQuestion(question);
+  }
 
-    final assistantId = _nextId();
-    _setState(
-      state.copyWith(
-        isTyping: true,
-        messages: [
-          ...state.messages,
-          ChatMessage(
-            id: _nextId(),
-            author: ChatAuthor.user,
-            text: question,
-            question: question,
-          ),
-          ChatMessage(
-            id: assistantId,
-            author: ChatAuthor.assistant,
-            text: '',
-            isStreaming: true,
-            question: question,
-          ),
-        ],
-      ),
+  Future<String?> regenerate(ChatMessage message) {
+    final index = state.messages.indexWhere((item) => item.id == message.id);
+    final current = index < 0 ? null : state.messages[index];
+    if (!state.canSend ||
+        current == null ||
+        current.author != ChatAuthor.assistant ||
+        current.isStreaming ||
+        current.isError ||
+        current.text.isEmpty ||
+        current.question == null ||
+        current.question!.trim().isEmpty) {
+      throw StateError('This assistant response cannot be regenerated.');
+    }
+    return _runQuestion(
+      current.question!,
+      previousAnswer: current,
+      isLatestTurn: index == state.messages.length - 1,
     );
+  }
 
+  Future<String?> _runQuestion(
+    String question, {
+    ChatMessage? previousAnswer,
+    ChatMessage? retryingAnswer,
+    bool isLatestTurn = false,
+  }) async {
+    final assistantId = (previousAnswer ?? retryingAnswer)?.id ?? _nextId();
+    final streamingAnswer = ChatMessage(
+      id: assistantId,
+      author: ChatAuthor.assistant,
+      text: '',
+      isStreaming: true,
+      question: question,
+    );
+    if (previousAnswer == null && retryingAnswer == null) {
+      _setState(
+        state.copyWith(
+          isTyping: true,
+          messages: [
+            ...state.messages,
+            ChatMessage(
+              id: _nextId(),
+              author: ChatAuthor.user,
+              text: question,
+              question: question,
+            ),
+            streamingAnswer,
+          ],
+        ),
+      );
+    } else {
+      _setState(
+        state.copyWith(
+          isTyping: true,
+          messages: [
+            for (final message in state.messages)
+              if (message.id == assistantId) streamingAnswer else message,
+          ],
+        ),
+      );
+    }
+    QuestionAnswer? lastAnswer;
+    Duration? generationDuration;
+    String? regenerationError;
+    var completed = false;
     try {
-      await for (final answer in _askQuestion.stream(question)) {
-        if (_disposed) return;
+      await for (final answer in _askQuestion.stream(
+        question,
+        onGenerationComplete: (duration) => generationDuration = duration,
+        turnId: assistantId,
+        regenerate: previousAnswer != null,
+        isLatestTurn: isLatestTurn,
+      )) {
+        if (_disposed) return null;
+        lastAnswer = answer;
         final isError =
             answer.status == QuestionAnswerStatus.retrievalFailure ||
             answer.status == QuestionAnswerStatus.modelUnavailable ||
             answer.status == QuestionAnswerStatus.generationFailure;
-        if (isError) {
-          _setState(state.copyWith(isTyping: false));
+        if (isError && previousAnswer != null) {
+          regenerationError = answer.answer;
+          continue;
         }
         _replaceMessage(
           assistantId,
           text: answer.answer,
           isStreaming: true,
           isError: isError,
-          sourceTitles: answer.documents
-              .map((document) => document.title)
-              .toList(growable: false),
         );
       }
+      completed = true;
     } finally {
       if (!_disposed) {
-        _replaceMessage(assistantId, isStreaming: false);
+        if (previousAnswer != null &&
+            (!completed || regenerationError != null)) {
+          _setState(
+            state.copyWith(
+              messages: [
+                for (final message in state.messages)
+                  if (message.id == assistantId) previousAnswer else message,
+              ],
+            ),
+          );
+        } else {
+          _replaceMessage(
+            assistantId,
+            isStreaming: false,
+            sources:
+                completed && lastAnswer?.status == QuestionAnswerStatus.answered
+                ? lastAnswer!.documents
+                : const [],
+            generationDuration:
+                completed && lastAnswer?.status == QuestionAnswerStatus.answered
+                ? generationDuration
+                : null,
+          );
+        }
         _setState(state.copyWith(isTyping: false));
       }
     }
+    return regenerationError;
   }
 
   Future<void> retry(ChatMessage message) {
-    final question = message.question;
-    return question == null ? Future<void>.value() : send(question);
+    final index = state.messages.indexWhere((item) => item.id == message.id);
+    final current = index < 0 ? null : state.messages[index];
+    if (!state.canSend ||
+        current == null ||
+        current.author != ChatAuthor.assistant ||
+        !current.isError ||
+        current.isStreaming ||
+        current.text.isEmpty ||
+        current.question == null ||
+        current.question!.trim().isEmpty) {
+      throw StateError('This assistant response cannot be retried.');
+    }
+    return _runQuestion(current.question!, retryingAnswer: current);
   }
 
   void clearHistory() {
@@ -142,7 +245,8 @@ class ChatController extends ChangeNotifier {
     String? text,
     bool? isStreaming,
     bool? isError,
-    List<String>? sourceTitles,
+    List<KnowledgeDocument>? sources,
+    Duration? generationDuration,
   }) {
     _setState(
       state.copyWith(
@@ -153,7 +257,8 @@ class ChatController extends ChangeNotifier {
                       text: text,
                       isStreaming: isStreaming,
                       isError: isError,
-                      sourceTitles: sourceTitles,
+                      sources: sources,
+                      generationDuration: generationDuration,
                     )
                   : message,
             )

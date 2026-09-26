@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:slm_ai_chatbot/features/chat/data/local_llm_chat_intent_router.dart';
@@ -33,6 +34,7 @@ class AppDependencies {
     required this.chatIntentEvaluationRunner,
     required this.retrievalEvaluationRunner,
     required this.prepareKnowledgeBase,
+    this.runtimeBackendLabel,
   });
 
   final LocalModelManager modelManager;
@@ -41,6 +43,7 @@ class AppDependencies {
   final ChatIntentEvaluationRunner chatIntentEvaluationRunner;
   final RetrievalEvaluationRunner retrievalEvaluationRunner;
   final Future<void> Function() prepareKnowledgeBase;
+  final String? Function()? runtimeBackendLabel;
 }
 
 /// Wires domain abstractions to local implementations before the app starts.
@@ -111,5 +114,12 @@ Future<AppDependencies> createAppDependencies() async {
     chatIntentEvaluationRunner: chatIntentEvaluationRunner,
     retrievalEvaluationRunner: retrievalEvaluationRunner,
     prepareKnowledgeBase: () async => ingestDocuments(),
+    runtimeBackendLabel: () =>
+        switch (FlutterGemmaPlugin.instance.initializedModel?.activeBackend) {
+          PreferredBackend.cpu => 'CPU',
+          PreferredBackend.gpu => 'GPU',
+          PreferredBackend.npu => 'NPU',
+          null => null,
+        },
   );
 }

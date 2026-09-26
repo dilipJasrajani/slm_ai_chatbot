@@ -24,6 +24,7 @@ Future<void> main() async {
       modelManager: dependencies.modelManager,
       askQuestion: dependencies.askQuestion,
       chatConfiguration: dependencies.chatConfiguration,
+      runtimeBackendLabel: dependencies.runtimeBackendLabel,
       chatIntentEvaluationRunner: dependencies.chatIntentEvaluationRunner,
       retrievalEvaluationRunner: dependencies.retrievalEvaluationRunner,
       prepareKnowledgeBase: dependencies.prepareKnowledgeBase,

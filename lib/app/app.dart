@@ -16,6 +16,8 @@ class MyApp extends StatelessWidget {
     this.retrievalEvaluationRunner,
     this.prepareKnowledgeBase,
     this.chatConfiguration = const AiChatConfiguration(),
+    this.chatTheme = const AiChatTheme(),
+    this.runtimeBackendLabel,
     super.key,
   });
 
@@ -25,6 +27,8 @@ class MyApp extends StatelessWidget {
   final RetrievalEvaluationRunner? retrievalEvaluationRunner;
   final Future<void> Function()? prepareKnowledgeBase;
   final AiChatConfiguration chatConfiguration;
+  final AiChatTheme chatTheme;
+  final String? Function()? runtimeBackendLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +39,8 @@ class MyApp extends StatelessWidget {
         modelManager: modelManager,
         askQuestion: askQuestion,
         configuration: chatConfiguration,
+        chatTheme: chatTheme,
+        runtimeBackendLabel: runtimeBackendLabel,
         chatIntentEvaluationRunner: chatIntentEvaluationRunner,
         prepareKnowledgeBase: prepareKnowledgeBase,
         retrievalEvaluationRunner: retrievalEvaluationRunner,
