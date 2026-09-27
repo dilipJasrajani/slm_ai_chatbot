@@ -41,7 +41,7 @@ class AiChatTheme {
   final Color? _borderColor;
   final Color? _inputBackgroundColor;
 
-  Color get primaryColor => _primaryColor ?? const Color(0xFF3F51B5);
+  Color get primaryColor => _primaryColor ?? const Color.fromARGB(255, 204, 44, 8);
   Color get accentColor => _accentColor ?? const Color(0xFF00A8A8);
   Color get backgroundColor => _backgroundColor ?? const Color(0xFFF9FAFF);
   Color get surfaceColor => _surfaceColor ?? Colors.white;
