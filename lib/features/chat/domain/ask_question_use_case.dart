@@ -178,7 +178,6 @@ class AskQuestionUseCase {
     void Function(Duration)? onGenerationComplete,
   ) async* {
     final profile = AiLatencyProfile.current;
-    profile?.route = 'KNOWLEDGE';
     profile?.mark(AiProfileEvent.retrievalQueryStart);
     final retrievalQuery =
         (_retrievalQueryBuilder ?? const RetrievalQueryBuilder()).build(

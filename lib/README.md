@@ -7,18 +7,13 @@ User
  ↓
 Chat
  ↓
-Router
- ├── CHAT → Qwen3
- │
- └── KNOWLEDGE
-       ↓
-   EmbeddingGemma
-       ↓
-    Vector DB
-       ↓
-    Grounding
-       ↓
-      Qwen3
+Retrieval query
+ ↓
+EmbeddingGemma + SQLite vector search
+ ↓
+Grounding
+ ├── relevant → RAG prompt → Qwen3
+ └── not relevant → restricted conversational prompt → Qwen3
 ```
 
 The application runs these components on the device. `app/` contains the
@@ -30,17 +25,16 @@ feature dependencies, and starts the Flutter app.
 1. `AiChatPage` reads the user's message and sends it to `ChatController`.
 2. `ChatController` adds user and streaming assistant messages to the UI, then
    consumes `AskQuestionUseCase.stream`.
-3. `AskQuestionUseCase` reads short-term conversation history and routes the
-   request as CHAT or KNOWLEDGE.
-4. CHAT requests build a conversational prompt and stream the local LLM.
-5. KNOWLEDGE requests build a history-aware retrieval query, search the local
-   RAG database, and check that the retrieved documents are relevant.
-6. Relevant documents are converted into prompt context before the local LLM
-   streams the grounded answer. Retrieval failures and ungrounded requests
-   return their existing controlled responses without generation.
-7. Successful completed answers are stored with the user message in
+3. `AskQuestionUseCase` reads short-term conversation history, builds a
+   history-aware retrieval query, searches the local RAG database, and checks
+   that retrieved documents are relevant.
+4. Relevant documents are converted into prompt context before the local LLM
+   streams a grounded answer. With no relevant documents, a restricted
+   conversational prompt is sent to the local LLM instead. Retrieval failures
+   return a controlled response without generation.
+5. Successful completed answers are stored with the user message in
    short-term conversation history.
-8. Each streamed answer is returned to `ChatController`, which updates the
+6. Each streamed answer is returned to `ChatController`, which updates the
    assistant message displayed by `AiChatPage`.
 
 ## AI request flow
@@ -52,46 +46,34 @@ ChatController
  ↓
 AskQuestionUseCase
  ↓
-ChatIntentRouter
- ├── CHAT
- │    ↓
- │   ConversationalPromptBuilder
- │    ↓
- │   LocalLlmService
- │    ↓
- │   Qwen3
- │
- └── KNOWLEDGE
-      ↓
-   RetrievalQueryBuilder
-      ↓
-   RagRepository
-      ↓
-   EmbeddingGemma + SQLite vector search
-      ↓
-   RetrievedKnowledgeRelevance
-      ↓
-   DocumentContextBuilder
-      ↓
-   RagPromptBuilder
-      ↓
-   LocalLlmService
-      ↓
-   Qwen3
+RetrievalQueryBuilder
+ ↓
+RagRepository
+ ↓
+EmbeddingGemma + SQLite vector search
+ ↓
+RetrievedKnowledgeRelevance
+ ├── relevant → DocumentContextBuilder → RagPromptBuilder
+ └── not relevant → ConversationalPromptBuilder (restricted)
+ ↓
+LocalLlmService
+ ↓
+Qwen3
 ```
 
 `ChatController` turns the UI event and streamed answer into presentation
-state. `AskQuestionUseCase` is the route-first orchestration point: both
-branches use the generic local LLM service, while only the KNOWLEDGE branch
-retrieves and grounds context. A successful completed answer is added to
-short-term conversation history before the final UI state is shown.
+state. `AskQuestionUseCase` retrieves and grounds first, then makes one
+generation call through the generic local LLM service if retrieval succeeds.
+A successful completed answer is added to short-term conversation history
+before the final UI state is shown. The legacy LLM router remains available
+only to the separate debug routing evaluation, not to chat requests.
 
 ## Local AI and model lifecycle
 
 ### LLM generation
 
 ```text
-Chat / RAG
+Restricted conversational / RAG prompt
     ↓
 LocalLlmService
     ↓
@@ -100,9 +82,9 @@ LocalLlmServiceImpl
 flutter_gemma / Qwen3
 ```
 
-Chat and RAG depend on the generic `LocalLlmService`. Its local implementation
-creates an inference session, submits the prompt, and streams generated output
-from the active local model.
+Both answer paths depend on the generic `LocalLlmService`. Its local
+implementation creates an inference session, submits the prompt, and streams
+generated output from the active local model.
 
 ### Output processing
 
@@ -250,15 +232,18 @@ Suggestions use the same composer send action as typed questions; the welcome
 view returns whenever the conversation has no messages.
 
 Pass `chatTheme: const AiChatTheme(primaryColor: Colors.teal, ...)` to `MyApp`
-or directly to `AiChatPage` to customize the accent and optionally the
-`assistantBubbleColor`, `assistantTextColor`, `userBubbleColor`, and
-`userTextColor`. The primary color also styles the send button, focused
-composer, and assistant avatar; `accentColor` styles suggested-prompt outlines.
-Unspecified bubble text colors are selected for contrast. The existing light
-palette remains the default; in a dark host `ThemeData`, unspecified colors
-come from its `ColorScheme`. Typography inherits the host `TextTheme` (including
-its font family). Other surfaces, borders, and spacing remain available through
-the existing `AiChatTheme` without adding configuration fields.
+or directly to `AiChatPage` to customize the accent, user bubble, and message
+text colors. The primary color also styles the send button, focused composer,
+and assistant avatar; `accentColor` styles suggested-prompt outlines.
+Assistant messages render directly on the chat background without a bubble;
+the existing `assistantBubbleColor` setting is retained for compatibility but
+does not color messages in this layout. Unspecified user text contrasts with
+the user bubble, while unspecified assistant text contrasts with the chat
+background. The existing light palette remains the default; in a dark host
+`ThemeData`, unspecified colors come from its `ColorScheme`. Typography
+inherits the host `TextTheme` (including its font family). Other surfaces,
+borders, and spacing remain available through the existing `AiChatTheme`
+without adding configuration fields.
 
 Completed, non-error assistant responses show a compact Copy action that copies
 only the response text (not timing or sources) and briefly confirms success.
@@ -273,16 +258,16 @@ show alt text rather than loading remote resources, keeping chat offline.
 
 Only the latest completed, non-error assistant response offers Regenerate
 (`showRegenerateAction: false` hides it); earlier responses can still be copied.
-This reuses the original question and local CHAT/KNOWLEDGE flow, streams into
-the same bubble, and replaces the prior answer in recent conversation history
-rather than adding a turn. On failure the prior response is kept and the
-existing error text is shown.
+This reuses the original question and retrieval-first flow, streams into
+the same message area, and replaces the prior answer in recent conversation
+history rather than adding a turn. On failure the prior response is kept and
+the existing error text is shown.
 
 Failed requests keep their user question and show a compact Retry action
 (`showRetryAction: false` hides Retry controls). Retrying reuses the existing
-CHAT/KNOWLEDGE pipeline and streams into the same assistant bubble without
-adding another user message or a failed turn to conversation history. A
-successful retry gets its normal sources, generation time, Copy, Regenerate,
+retrieval-first pipeline and streams into the same assistant message area
+without adding another user message or a failed turn to conversation history.
+A successful retry gets its normal sources, generation time, Copy, Regenerate,
 and Markdown presentation. Retrying an older failure records the recovered
 turn when the retry completes; existing successful turns are not rewritten.
 Local model loading errors show a concise message
@@ -292,8 +277,9 @@ may cache a failure until the app restarts.
 
 ## Folder responsibilities
 
-`features/chat` contains conversation behavior, CHAT/KNOWLEDGE routing,
-conversation history, chat evaluation, and the chat UI.
+`features/chat` contains conversation behavior, conversation history, the
+retrieval-first chat orchestrator, historical debug routing evaluation, and
+the chat UI.
 
 `features/llm` contains the generic local-generation abstraction and the
 Qwen3 generation implementation, including Qwen3 output-channel parsing.

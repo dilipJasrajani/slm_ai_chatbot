@@ -807,14 +807,14 @@ class _ChatBubble extends StatelessWidget {
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            AiAvatar(
-              theme: theme,
-              assistantName: assistantName,
-              assistantAvatar: assistantAvatar,
-            ),
-            const SizedBox(width: 8),
-          ],
+          // if (!isUser) ...[
+          //   AiAvatar(
+          //     theme: theme,
+          //     assistantName: assistantName,
+          //     assistantAvatar: assistantAvatar,
+          //   ),
+          //   const SizedBox(width: 8),
+          // ],
           Flexible(
             child: Column(
               crossAxisAlignment: isUser
@@ -823,31 +823,38 @@ class _ChatBubble extends StatelessWidget {
               children: [
                 Semantics(
                   label: isUser ? 'Your message' : 'Assistant message',
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: theme.spacing,
-                      vertical: theme.spacing * .75,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isUser
-                          ? theme.userBubbleColor
-                          : theme.assistantBubbleColor,
-                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
-                      border: Border.all(
-                        color: message.isError
-                            ? theme.primaryColor.withValues(alpha: .65)
-                            : theme.borderColor,
-                      ),
-                    ),
-                    child: onFirstVisibleText == null
-                        ? messageContent
-                        : Builder(
-                            builder: (contentContext) {
-                              onFirstVisibleText!(contentContext);
-                              return messageContent;
-                            },
+                  child: isUser
+                      ? Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: theme.spacing,
+                            vertical: theme.spacing * .75,
                           ),
-                  ),
+                          decoration: BoxDecoration(
+                            color: theme.userBubbleColor,
+                            borderRadius: BorderRadius.circular(
+                              theme.bubbleRadius,
+                            ),
+                            border: Border.all(
+                              color: message.isError
+                                  ? theme.primaryColor.withValues(alpha: .65)
+                                  : theme.borderColor,
+                            ),
+                          ),
+                          child: messageContent,
+                        )
+                      : Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: theme.spacing * .75,
+                          ),
+                          child: onFirstVisibleText == null
+                              ? messageContent
+                              : Builder(
+                                  builder: (contentContext) {
+                                    onFirstVisibleText!(contentContext);
+                                    return messageContent;
+                                  },
+                                ),
+                        ),
                 ),
                 if (showTime || showCopy || showRegenerate)
                   Padding(
@@ -1063,6 +1070,13 @@ class _TypingIndicatorState extends State<_TypingIndicator>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // const SizedBox(width: 6),
+            Text(
+              'Thinking ',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: widget.theme.assistantTextColor,
+              ),
+            ),
             AnimatedBuilder(
               animation: _animationController,
               builder: (context, _) => Row(
@@ -1083,13 +1097,6 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                     ),
                   );
                 }),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Thinking…',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: widget.theme.assistantTextColor,
               ),
             ),
           ],

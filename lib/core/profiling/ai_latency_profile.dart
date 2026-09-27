@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 enum AiProfileEvent {
-  routerStart,
-  routerEnd,
   retrievalQueryStart,
   retrievalQueryEnd,
   searchStart,
@@ -28,7 +26,7 @@ enum AiProfileEvent {
   requestEnd,
 }
 
-enum AiGenerationPhase { router, finalAnswer }
+enum AiGenerationPhase { finalAnswer }
 
 class AiNativeMetrics {
   const AiNativeMetrics({
@@ -76,19 +74,15 @@ class AiLatencyProfile {
   final Map<AiGenerationPhase, AiNativeMetrics> _nativeMetrics = {};
   final Map<AiGenerationPhase, String> _nativeUnavailable = {};
   AiGenerationPhase? generationPhase;
-  String? route;
   String backend = 'UNKNOWN';
   int? historyMessageCount;
   int? historyCharacters;
-  int? routerPromptCharacters;
-  int? routerOutputCharacters;
   int? chatPromptCharacters;
   int? ragPromptCharacters;
   int? retrievedContextCharacters;
   int? userQueryCharacters;
   int? retrievedCount;
   int? groundedCount;
-  bool routerFallback = false;
   bool _completed = false;
 
   Duration? elapsedAt(AiProfileEvent event) => _events[event];
@@ -136,40 +130,31 @@ class AiLatencyProfile {
     if (_completed) return;
     mark(AiProfileEvent.requestEnd);
     _completed = true;
-    _write(
-      'Request complete: route=${route ?? 'UNKNOWN'}, status=$status, '
-      'backend=$backend',
-    );
+    _write('Request complete: status=$status, backend=$backend');
     _write('Total request: ${_sinceStart(AiProfileEvent.requestEnd)}');
     _write(
-      'Router: ${_between(AiProfileEvent.routerStart, AiProfileEvent.routerEnd)}'
-      '${routerFallback ? ' (fallback used)' : ''}',
+      'Retrieval query: ${_between(AiProfileEvent.retrievalQueryStart, AiProfileEvent.retrievalQueryEnd, milliseconds: true)}',
     );
-    if (route == 'KNOWLEDGE') {
-      _write(
-        'Retrieval query: ${_between(AiProfileEvent.retrievalQueryStart, AiProfileEvent.retrievalQueryEnd, milliseconds: true)}',
-      );
-      _write(
-        'Embedding + vector search: ${_between(AiProfileEvent.embeddingAndVectorSearchStart, AiProfileEvent.embeddingAndVectorSearchEnd, milliseconds: true)}'
-        ' (not separately measurable at current application boundary)',
-      );
-      _write(
-        'Search including preparation/decoding: ${_between(AiProfileEvent.searchStart, AiProfileEvent.searchEnd, milliseconds: true)}',
-      );
-      _write(
-        'Metadata decode: ${_between(AiProfileEvent.metadataDecodeStart, AiProfileEvent.metadataDecodeEnd, milliseconds: true)}',
-      );
-      _write(
-        'Grounding: ${_between(AiProfileEvent.groundingStart, AiProfileEvent.groundingEnd, milliseconds: true)}',
-      );
-      _write(
-        'Context build: ${_between(AiProfileEvent.contextBuildStart, AiProfileEvent.contextBuildEnd, milliseconds: true)}',
-      );
-      _write(
-        'Results: retrieved=${retrievedCount ?? 'Not available'}, '
-        'grounded=${groundedCount ?? 'Not available'}',
-      );
-    }
+    _write(
+      'Embedding + vector search: ${_between(AiProfileEvent.embeddingAndVectorSearchStart, AiProfileEvent.embeddingAndVectorSearchEnd, milliseconds: true)}'
+      ' (not separately measurable at current application boundary)',
+    );
+    _write(
+      'Search including preparation/decoding: ${_between(AiProfileEvent.searchStart, AiProfileEvent.searchEnd, milliseconds: true)}',
+    );
+    _write(
+      'Metadata decode: ${_between(AiProfileEvent.metadataDecodeStart, AiProfileEvent.metadataDecodeEnd, milliseconds: true)}',
+    );
+    _write(
+      'Grounding: ${_between(AiProfileEvent.groundingStart, AiProfileEvent.groundingEnd, milliseconds: true)}',
+    );
+    _write(
+      'Context build: ${_between(AiProfileEvent.contextBuildStart, AiProfileEvent.contextBuildEnd, milliseconds: true)}',
+    );
+    _write(
+      'Results: retrieved=${retrievedCount ?? 'Not available'}, '
+      'grounded=${groundedCount ?? 'Not available'}',
+    );
     _write(
       'Final prompt build: ${_between(AiProfileEvent.promptBuildStart, AiProfileEvent.promptBuildEnd, milliseconds: true)}',
     );
@@ -188,16 +173,13 @@ class AiLatencyProfile {
       'first visible assistant text (post-frame): ${_sinceStart(AiProfileEvent.firstRenderedText)}',
     );
     _write(
-      'Prompt characters: router=${routerPromptCharacters ?? 'Not available'}, '
-      'router output=${routerOutputCharacters ?? 'Not available'}, '
-      'CHAT=${chatPromptCharacters ?? 'Not available'}, '
+      'Prompt characters: fallback=${chatPromptCharacters ?? 'Not available'}, '
       'RAG=${ragPromptCharacters ?? 'Not available'}, '
       'history=${historyCharacters ?? 'Not available'} '
       '(${historyMessageCount ?? 'Not available'} messages), '
       'context=${retrievedContextCharacters ?? 'Not available'}, '
       'query=${userQueryCharacters ?? 'Not available'}',
     );
-    _writeMetrics('Router', AiGenerationPhase.router);
     _writeMetrics('Final', AiGenerationPhase.finalAnswer);
   }
 

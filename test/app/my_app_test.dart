@@ -467,6 +467,100 @@ void main() {
     await modelManager.dispose();
   });
 
+  testWidgets('only grounded retrieval results appear as sources', (
+    tester,
+  ) async {
+    const candidates = [
+      RagSearchResult(
+        document: KnowledgeDocument(
+          id: 'error-e123',
+          title: 'Device cannot connect to network',
+          content: 'Check Wi-Fi credentials.',
+          metadata: {'code': 'E123'},
+        ),
+        similarity: 1,
+      ),
+      RagSearchResult(
+        document: KnowledgeDocument(
+          id: 'installation',
+          title: 'Boiler installation instructions',
+          content: 'Install the boiler on a level surface.',
+          metadata: {},
+        ),
+        similarity: .9,
+      ),
+      RagSearchResult(
+        document: KnowledgeDocument(
+          id: 'maintenance',
+          title: 'Annual maintenance schedule',
+          content: 'Schedule a yearly inspection.',
+          metadata: {},
+        ),
+        similarity: .8,
+      ),
+    ];
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final repository = _FakeRagRepository(candidates);
+    final askQuestion = _askQuestion(
+      _FakeLlmService(() => Stream.value('Answer.')),
+      repository: repository,
+    );
+    final controller = ChatController(
+      modelManager: modelManager,
+      askQuestion: askQuestion,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiChatPage(
+          modelManager: modelManager,
+          askQuestion: askQuestion,
+          controller: controller,
+        ),
+      ),
+    );
+
+    await controller.send('Hello');
+    await tester.pumpAndSettle();
+    final ungroundedMessage = controller.state.messages.last;
+    expect(repository.searchCount, 1);
+    expect(repository.results, hasLength(3));
+    expect(ungroundedMessage.sources, isEmpty);
+    expect(find.textContaining('Sources'), findsNothing);
+    expect(find.text('Device cannot connect to network'), findsNothing);
+    final ungroundedHeight = tester.getSize(
+      find.byKey(ValueKey(ungroundedMessage.id)),
+    ).height;
+
+    repository.results = const [];
+    await controller.send('Hi');
+    await tester.pumpAndSettle();
+    final emptyRetrievalMessage = controller.state.messages.last;
+    expect(emptyRetrievalMessage.sources, isEmpty);
+    expect(find.textContaining('Sources'), findsNothing);
+    expect(
+      tester.getSize(find.byKey(ValueKey(emptyRetrievalMessage.id))).height,
+      ungroundedHeight,
+    );
+
+    repository.results = candidates;
+    await controller.send('What is E123?');
+    await tester.pumpAndSettle();
+    final groundedMessage = controller.state.messages.last;
+    expect(repository.searchCount, 3);
+    expect(groundedMessage.sources, hasLength(1));
+    expect(groundedMessage.sources.single.id, 'error-e123');
+    expect(find.text('Sources · 1'), findsOneWidget);
+    expect(find.text('E123 — Device cannot connect to network'), findsOneWidget);
+    expect(find.text('Boiler installation instructions'), findsNothing);
+    expect(find.text('Annual maintenance schedule'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
   testWidgets('source visibility can be disabled independently', (
     tester,
   ) async {
@@ -683,7 +777,7 @@ void main() {
       find.text('Check the connection.'),
     );
     expect(userText.style?.color, const Color(0xFF1A1C20));
-    expect(assistantText.style?.color, Colors.white);
+    expect(assistantText.style?.color, chatTheme.backgroundTextColor);
     final userBubble = tester
         .widgetList<Container>(
           find.ancestor(
@@ -692,16 +786,8 @@ void main() {
           ),
         )
         .firstWhere((container) => container.decoration is BoxDecoration);
-    final assistantBubble = tester
-        .widgetList<Container>(
-          find.ancestor(
-            of: find.text('Check the connection.'),
-            matching: find.byType(Container),
-          ),
-        )
-        .firstWhere((container) => container.decoration is BoxDecoration);
     expect((userBubble.decoration! as BoxDecoration).color, Colors.yellow);
-    expect((assistantBubble.decoration! as BoxDecoration).color, Colors.black);
+    _expectNoAssistantDecoration(tester, find.text('Check the connection.'));
     expect(
       tester.widget<Text>(find.text('Sources · 1')).style?.color,
       chatTheme.backgroundTextColor.withValues(alpha: .75),
@@ -749,18 +835,7 @@ void main() {
         tester.widget<Text>(find.text('Dark mode answer.')).style?.color,
         Colors.white,
       );
-      final answerBubble = tester
-          .widgetList<Container>(
-            find.ancestor(
-              of: find.text('Dark mode answer.'),
-              matching: find.byType(Container),
-            ),
-          )
-          .firstWhere((container) => container.decoration is BoxDecoration);
-      expect(
-        (answerBubble.decoration! as BoxDecoration).color,
-        darkTheme.colorScheme.surfaceContainerHighest,
-      );
+      _expectNoAssistantDecoration(tester, find.text('Dark mode answer.'));
       expect(find.text('Sources · 1'), findsNothing);
       expect(
         tester
@@ -775,6 +850,212 @@ void main() {
       await modelManager.dispose();
     },
   );
+
+  testWidgets('only user messages retain a bubble in light and dark layouts', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetViewInsets();
+    });
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final askQuestion = _askQuestion(
+      _FakeLlmService(() => Stream.value('unused')),
+    );
+    const chatTheme = AiChatTheme(
+      userBubbleColor: Colors.yellow,
+      assistantBubbleColor: Colors.black,
+    );
+    const answer = 'Hello! How can I help you?';
+    final controller = _MessagesController(
+      modelManager: modelManager,
+      askQuestion: askQuestion,
+      messages: const [
+        ChatMessage(id: 'user', author: ChatAuthor.user, text: 'Hello'),
+        ChatMessage(
+          id: 'assistant',
+          author: ChatAuthor.assistant,
+          text: answer,
+          question: 'Hello',
+        ),
+      ],
+    );
+    for (final hostTheme in [ThemeData.light(), ThemeData.dark()]) {
+      for (final size in [const Size(320, 640), const Size(900, 1100)]) {
+        tester.view.physicalSize = size;
+        final resolvedTheme = chatTheme.resolve(hostTheme.colorScheme);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: hostTheme,
+            home: AiChatPage(
+              modelManager: modelManager,
+              askQuestion: askQuestion,
+              controller: controller,
+              chatTheme: chatTheme,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final userBubble = tester
+            .widgetList<Container>(
+              find.ancestor(
+                of: find.text('Hello'),
+                matching: find.byType(Container),
+              ),
+            )
+            .firstWhere((container) => container.decoration is BoxDecoration);
+        final decoration = userBubble.decoration! as BoxDecoration;
+        expect(decoration.color, Colors.yellow);
+        expect(
+          decoration.borderRadius,
+          BorderRadius.circular(chatTheme.bubbleRadius),
+        );
+        expect(decoration.border, Border.all(color: resolvedTheme.borderColor));
+        expect(
+          userBubble.padding,
+          EdgeInsets.symmetric(
+            horizontal: chatTheme.spacing,
+            vertical: chatTheme.spacing * .75,
+          ),
+        );
+        expect(
+          tester.widget<Text>(find.text('Hello')).style?.color,
+          chatTheme.userTextColor,
+        );
+        _expectNoAssistantDecoration(tester, find.text(answer));
+        expect(
+          tester.widget<Text>(find.text(answer)).style?.color,
+          resolvedTheme.backgroundTextColor,
+        );
+        expect(
+          tester.getTopLeft(find.text('Hello')).dx,
+          greaterThan(tester.getTopLeft(find.text(answer)).dx),
+        );
+        expect(find.byType(AiAvatar), findsOneWidget);
+        expect(find.byTooltip('Copy response'), findsOneWidget);
+        expect(find.byTooltip('Regenerate response'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    }
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
+  testWidgets('thinking, streaming, code and Retry have no assistant bubble', (
+    tester,
+  ) async {
+    String? clipboardText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboardText =
+              (call.arguments as Map<Object?, Object?>)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final response = StreamController<String>();
+    var generations = 0;
+    await tester.pumpWidget(
+      MyApp(
+        modelManager: modelManager,
+        askQuestion: _askQuestion(
+          _FakeLlmService(() {
+            generations++;
+            return switch (generations) {
+              1 => response.stream,
+              2 => Stream<String>.error(StateError('Unavailable')),
+              _ => Stream.value('Recovered answer.'),
+            };
+          }),
+        ),
+      ),
+    );
+    await tester.enterText(
+      find.byType(TextField),
+      'How do I troubleshoot a network connection?',
+    );
+    await tester.tap(find.byTooltip('Send message'));
+    await tester.pump();
+    expect(find.text('Thinking…'), findsOneWidget);
+    _expectNoAssistantDecoration(tester, find.text('Thinking…'));
+
+    response.add('The device cannot connect.');
+    await tester.pump();
+    expect(find.text('The device cannot connect.'), findsOneWidget);
+    _expectNoAssistantDecoration(
+      tester,
+      find.text('The device cannot connect.'),
+    );
+    const rest = '\n\n## Steps\n\n- Check `E123`\n\n```dart\nfinal x = 1;\n```';
+    response.add(rest);
+    await tester.pump();
+    await response.close();
+    await tester.pumpAndSettle();
+    expect(find.text('Steps'), findsOneWidget);
+    expect(find.text('Check E123'), findsOneWidget);
+    _expectNoAssistantDecoration(tester, find.text('Steps'));
+    final codeBlock = tester
+        .widgetList<Container>(
+          find.ancestor(
+            of: find.text('final x = 1;'),
+            matching: find.byType(Container),
+          ),
+        )
+        .firstWhere((container) => container.decoration is BoxDecoration);
+    expect(
+      (codeBlock.decoration! as BoxDecoration).color,
+      const AiChatTheme().surfaceColor,
+    );
+    expect(find.byTooltip('Copy code'), findsOneWidget);
+    expect(find.text('Sources · 1'), findsOneWidget);
+    expect(
+      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Copy response'), findsOneWidget);
+    expect(find.byTooltip('Regenerate response'), findsOneWidget);
+    await tester.tap(find.byTooltip('Copy response'));
+    await tester.pump();
+    expect(clipboardText, 'The device cannot connect.$rest');
+    await tester.tap(find.byTooltip('Copy code'));
+    await tester.pump();
+    expect(clipboardText, 'final x = 1;');
+
+    await tester.enterText(find.byType(TextField), 'Network connection help');
+    await tester.tap(find.byTooltip('Send message'));
+    await tester.pumpAndSettle();
+    const error = 'Local AI model is not installed or could not be loaded.';
+    expect(find.text(error), findsOneWidget);
+    _expectNoAssistantDecoration(tester, find.text(error));
+    expect(find.text('Retry'), findsOneWidget);
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Recovered answer.'), findsOneWidget);
+    _expectNoAssistantDecoration(tester, find.text('Recovered answer.'));
+    expect(find.text('Retry'), findsNothing);
+    expect(find.byTooltip('Copy response'), findsOneWidget);
+    expect(find.byTooltip('Regenerate response'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await modelManager.dispose();
+  });
 
   testWidgets('themed welcome stays responsive on narrow and wide screens', (
     tester,
@@ -2095,7 +2376,7 @@ void main() {
     );
     expect(
       const AiChatTheme(assistantBubbleColor: Colors.black).assistantTextColor,
-      Colors.white,
+      const Color(0xFF1A1C20),
     );
     expect(
       const AiChatTheme(userTextColor: Colors.blue).userTextColor,
@@ -2108,8 +2389,23 @@ void main() {
     expect(dark.backgroundColor, ThemeData.dark().colorScheme.surface);
     expect(dark.primaryColor, Colors.amber);
     expect(dark.userTextColor, const Color(0xFF1A1C20));
-    expect(dark.assistantTextColor, const Color(0xFF1A1C20));
+    expect(dark.assistantTextColor, Colors.white);
+    expect(
+      const AiChatTheme(assistantTextColor: Colors.blue).assistantTextColor,
+      Colors.blue,
+    );
   });
+}
+
+void _expectNoAssistantDecoration(WidgetTester tester, Finder content) {
+  final decoratedAncestors = tester
+      .widgetList<Container>(
+        find.ancestor(of: content, matching: find.byType(Container)),
+      )
+      .where(
+        (container) => container.color != null || container.decoration != null,
+      );
+  expect(decoratedAncestors, isEmpty);
 }
 
 class _MessagesController extends ChatController {

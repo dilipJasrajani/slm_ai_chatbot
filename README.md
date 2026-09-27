@@ -29,7 +29,9 @@ not committed to this repository.
 ## Intent routing evaluation
 
 In debug builds, **Run Routing Evaluation (Debug)** evaluates the bundled
-router dataset in `assets/evaluation/chat_intent_cases.json` with the same
-local model-backed router used by chat. It reports accuracy plus average and
-maximum routing latency for the current device/session. It does not change
-packages, models, or RAG retrieval behavior.
+historical router dataset in `assets/evaluation/chat_intent_cases.json` using
+an experimental local model-backed router. It reports accuracy plus average
+and maximum routing latency for the current device/session. The production
+chat path does not use this router: it always retrieves and checks grounding
+before building either a RAG prompt or a restricted conversational prompt.
+Running the debug evaluation does not change chat or RAG retrieval behavior.

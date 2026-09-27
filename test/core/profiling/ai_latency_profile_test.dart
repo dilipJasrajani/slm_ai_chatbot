@@ -3,10 +3,7 @@ import 'dart:async';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
-import 'package:slm_ai_chatbot/features/chat/data/local_llm_chat_intent_router.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/chat_intent_router.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/chat_route.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_message.dart';
 import 'package:slm_ai_chatbot/features/llm/data/local_llm_service_impl.dart';
@@ -17,7 +14,7 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
-  test('CHAT records retrieval, prompt, history and generation', () async {
+  test('fallback records retrieval, prompt, history and generation', () async {
     final logs = <String>[];
     final profile = AiLatencyProfile(requestNumber: 1, log: logs.add);
     final history = InMemoryConversationHistory()
@@ -53,14 +50,11 @@ void main() {
     ]);
     expect(answers.last.documents, isEmpty);
     expect(rag.searches, 1);
-    expect(profile.route, 'KNOWLEDGE');
     expect(profile.historyMessageCount, 2);
     expect(profile.historyCharacters, greaterThan(0));
     expect(profile.userQueryCharacters, question.length);
     expect(profile.chatPromptCharacters, llm.prompt!.length);
     expect(profile.ragPromptCharacters, isNull);
-    expect(profile.elapsedAt(AiProfileEvent.routerStart), isNull);
-    expect(profile.elapsedAt(AiProfileEvent.routerEnd), isNull);
     expect(profile.elapsedAt(AiProfileEvent.promptBuildEnd), isNotNull);
     expect(profile.elapsedAt(AiProfileEvent.finalLlmStart), isNotNull);
     expect(profile.elapsedAt(AiProfileEvent.finalLlmEnd), isNotNull);
@@ -70,9 +64,10 @@ void main() {
       logs.where((line) => line.contains('Request complete')),
       hasLength(1),
     );
-    expect(logs.join('\n'), contains('route=KNOWLEDGE, status=answered'));
+    expect(logs.join('\n'), contains('Request complete: status=answered'));
     expect(logs.join('\n'), contains('Results: retrieved=0, grounded=0'));
-    expect(profile.routerPromptCharacters, isNull);
+    expect(logs.join('\n'), contains('Prompt characters: fallback='));
+    expect(logs.join('\n'), isNot(contains('Router:')));
     expect(logs.join('\n'), contains('Final native metrics: Not available'));
     expect(logs.join('\n'), isNot(contains(question)));
     expect(logs.join('\n'), isNot(contains('Secret prior')));
@@ -80,7 +75,7 @@ void main() {
   });
 
   test(
-    'KNOWLEDGE profiles search and decode without changing grounded answer',
+    'grounded answer profiles search and decode without changing response',
     () async {
       final logs = <String>[];
       final profile = AiLatencyProfile(requestNumber: 2, log: logs.add);
@@ -103,10 +98,6 @@ void main() {
       expect(answers.last.documents.single.id, 'e123');
       expect(runtime.query, question);
       expect(runtime.topK, 3);
-      expect(profile.route, 'KNOWLEDGE');
-      expect(profile.elapsedAt(AiProfileEvent.routerStart), isNull);
-      expect(profile.elapsedAt(AiProfileEvent.routerEnd), isNull);
-      expect(profile.routerPromptCharacters, isNull);
       expect(llm.calls, 1);
       expect(profile.retrievedCount, 1);
       expect(profile.groundedCount, 1);
@@ -134,7 +125,7 @@ void main() {
         expect(profile.elapsedAt(event), isNotNull, reason: '$event');
       }
       expect(logs.join('\n'), contains('Results: retrieved=1, grounded=1'));
-      expect(logs.join('\n'), contains('route=KNOWLEDGE, status=answered'));
+      expect(logs.join('\n'), contains('Request complete: status=answered'));
       expect(logs.join('\n'), isNot(contains(question)));
       expect(logs.join('\n'), isNot(contains('Check Wi-Fi.')));
     },
@@ -159,7 +150,6 @@ void main() {
               ? QuestionAnswerStatus.retrievalFailure
               : QuestionAnswerStatus.answered,
         );
-        expect(profile.route, 'KNOWLEDGE');
         expect(profile.retrievedCount, failing ? isNull : 0);
         expect(profile.groundedCount, failing ? isNull : 0);
         expect(profile.elapsedAt(AiProfileEvent.searchEnd), isNotNull);
@@ -205,46 +195,6 @@ void main() {
   );
 
   test(
-    'router fallback records counts without changing fallback route',
-    () async {
-      final profile = AiLatencyProfile(requestNumber: 5, log: (_) {});
-      final llm = _Llm(() => Stream.error(StateError('router failed')));
-      final router = LocalLlmChatIntentRouter(
-        llmService: llm,
-        fallbackRouter: const _Route(ChatRoute.chat),
-      );
-      final route = await AiLatencyProfile.run(
-        profile,
-        () => router.route('Private classification input'),
-      );
-      expect(route, ChatRoute.chat);
-      expect(profile.routerFallback, isTrue);
-      expect(profile.routerPromptCharacters, llm.prompt!.length);
-      expect(profile.routerOutputCharacters, isNull);
-    },
-  );
-
-  test(
-    'router success records input and output sizes without final marks',
-    () async {
-      final profile = AiLatencyProfile(requestNumber: 6, log: (_) {});
-      final llm = _Llm(() => Stream.fromIterable([' CH', 'AT ']));
-      final router = LocalLlmChatIntentRouter(llmService: llm);
-      final route = await AiLatencyProfile.run(
-        profile,
-        () => router.route('Private classification input'),
-      );
-      expect(route, ChatRoute.chat);
-      expect(profile.routerFallback, isFalse);
-      expect(profile.routerPromptCharacters, llm.prompt!.length);
-      expect(profile.routerOutputCharacters, ' CHAT '.length);
-      expect(profile.generationPhase, AiGenerationPhase.router);
-      expect(profile.elapsedAt(AiProfileEvent.firstRawChunk), isNull);
-      expect(profile.elapsedAt(AiProfileEvent.firstParsedChunk), isNull);
-    },
-  );
-
-  test(
     'absent zone and null profile do not mark an unrelated profile',
     () async {
       final profile = AiLatencyProfile(requestNumber: 6, log: (_) {});
@@ -259,8 +209,7 @@ void main() {
       );
       await useCase.stream('Hi again').toList();
       expect(AiLatencyProfile.current, isNull);
-      expect(profile.route, isNull);
-      expect(profile.elapsedAt(AiProfileEvent.routerStart), isNull);
+      expect(profile.elapsedAt(AiProfileEvent.retrievalQueryStart), isNull);
       expect(profile.chatPromptCharacters, isNull);
     },
   );
@@ -366,13 +315,6 @@ void main() {
       hasLength(1),
     );
   });
-}
-
-class _Route implements ChatIntentRouter {
-  const _Route(this.value);
-  final ChatRoute value;
-  @override
-  Future<ChatRoute> route(String message) async => value;
 }
 
 class _Llm implements LocalLlmService {

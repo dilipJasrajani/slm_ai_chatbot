@@ -51,7 +51,7 @@ class AiChatTheme {
   Color get primaryTextColor => _readableOn(primaryColor);
   Color get userTextColor => _userTextColor ?? _readableOn(userBubbleColor);
   Color get assistantTextColor =>
-      _assistantTextColor ?? _readableOn(assistantBubbleColor);
+      _assistantTextColor ?? _readableOn(backgroundColor);
   Color get surfaceTextColor => _readableOn(surfaceColor);
   Color get backgroundTextColor => _readableOn(backgroundColor);
   Color get inputTextColor => _readableOn(inputBackgroundColor);
@@ -113,7 +113,7 @@ class AiChatConfiguration {
       'What does error E123 mean?',
       'How do I troubleshoot a network connection?',
     ],
-    this.showLocalSources = true,
+    this.showLocalSources = false,
     this.sourceSectionLabel = 'Sources',
     this.modelLabel = 'Qwen3 0.6B \u00B7 Local',
     this.showModelLabel = true,
