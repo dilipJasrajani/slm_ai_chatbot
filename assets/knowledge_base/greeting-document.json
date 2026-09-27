@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "id": "greeting-hello",
+      "title": "Greeting - Hello",
+      "content": "The user is greeting the assistant with a simple hello. Respond with a short, friendly greeting and offer to help with questions related to the available knowledge base.",
+      "metadata": {
+        "type": "greeting",
+        "intent": "hello"
+      }
+    },
+    {
+      "id": "greeting-hi",
+      "title": "Greeting - Hi",
+      "content": "The user is greeting the assistant with a simple hi. Respond with a short, friendly greeting and offer to help.",
+      "metadata": {
+        "type": "greeting",
+        "intent": "hello"
+      }
+    },
+    {
+      "id": "greeting-good-morning",
+      "title": "Greeting - Good Morning",
+      "content": "The user is greeting the assistant with good morning. Respond with a short, friendly good morning greeting and offer to help.",
+      "metadata": {
+        "type": "greeting",
+        "intent": "greeting"
+      }
+    },
+    {
+      "id": "greeting-good-afternoon",
+      "title": "Greeting - Good Afternoon",
+      "content": "The user is greeting the assistant with good afternoon. Respond with a short, friendly good afternoon greeting and offer to help.",
+      "metadata": {
+        "type": "greeting",
+        "intent": "greeting"
+      }
+    },
+    {
+      "id": "greeting-good-evening",
+      "title": "Greeting - Good Evening",
+      "content": "The user is greeting the assistant with good evening. Respond with a short, friendly good evening greeting and offer to help.",
+      "metadata": {
+        "type": "greeting",
+        "intent": "greeting"
+      }
+    },
+    {
+      "id": "greeting-thanks",
+      "title": "Conversation - Thanks",
+      "content": "The user is thanking the assistant. Respond with a short, friendly acknowledgement such as you're welcome or happy to help.",
+      "metadata": {
+        "type": "conversation",
+        "intent": "thanks"
+      }
+    },
+    {
+      "id": "greeting-thank-you",
+      "title": "Conversation - Thank You",
+      "content": "The user is saying thank you. Respond with a short, friendly acknowledgement and do not provide additional technical information unless the user asks for it.",
+      "metadata": {
+        "type": "conversation",
+        "intent": "thanks"
+      }
+    },
+    {
+      "id": "greeting-bye",
+      "title": "Conversation - Goodbye",
+      "content": "The user is saying goodbye. Respond with a short, friendly farewell.",
+      "metadata": {
+        "type": "conversation",
+        "intent": "goodbye"
+      }
+    },
+    {
+      "id": "greeting-acknowledgement",
+      "title": "Conversation - Acknowledgement",
+      "content": "The user is acknowledging the previous response with phrases such as okay, alright, got it, understood, or that makes sense. Respond briefly and naturally without introducing unrelated technical information.",
+      "metadata": {
+        "type": "conversation",
+        "intent": "acknowledgement"
+      }
+    }
+  ]
+}

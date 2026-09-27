@@ -124,7 +124,7 @@ class AiChatConfiguration {
     this.showRegenerateAction = true,
     this.showRetryAction = true,
     this.scrollThreshold = 160,
-    this.maxHistoryMessages = 6,
+    this.maxHistoryMessages = 4,
   });
 
   final String title;

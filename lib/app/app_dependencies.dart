@@ -19,7 +19,7 @@ import 'package:slm_ai_chatbot/features/model/data/local_model_repository_impl.d
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_embedding_model_initializer.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_rag_sqlite_repository.dart';
-import 'package:slm_ai_chatbot/features/rag/data/json_document_source.dart';
+import 'package:slm_ai_chatbot/features/rag/data/json_document_directory_source.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/ingest_documents_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/data/json_retrieval_evaluation_dataset_source.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/evaluate_retrieval_use_case.dart';
@@ -88,7 +88,10 @@ Future<AppDependencies> createAppDependencies() async {
     ),
   );
   final ingestDocuments = IngestDocumentsUseCase(
-    documentSource: JsonDocumentSource(assetBundle: rootBundle),
+    documentSource: JsonDocumentDirectorySource(
+      assetBundle: rootBundle,
+      assetDirectory: 'assets/knowledge_base/',
+    ),
     ragRepository: ragRepository,
   );
   final retrievalEvaluationRunner = RetrievalEvaluationRunner(

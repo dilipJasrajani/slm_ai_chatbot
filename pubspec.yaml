@@ -65,7 +65,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/knowledge_base/documents.json
+    - assets/knowledge_base/
     - assets/evaluation/chat_intent_cases.json
     - assets/evaluation/retrieval_cases.json
 
