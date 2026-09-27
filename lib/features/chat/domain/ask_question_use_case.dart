@@ -1,13 +1,10 @@
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/chat_intent_router.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/chat_response_configuration.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/chat_route.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_message.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversational_prompt_builder.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/deterministic_chat_intent_router.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/document_context_builder.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
@@ -37,14 +34,13 @@ class QuestionAnswer {
   final List<KnowledgeDocument> documents;
 }
 
-/// Orchestrates one user question from routing through streaming and history.
+/// Orchestrates retrieval, grounding, generation, and history for one question.
 class AskQuestionUseCase {
   AskQuestionUseCase({
     required RagRepository ragRepository,
     required LocalLlmService llmService,
     DocumentContextBuilder contextBuilder = const DocumentContextBuilder(),
     RagPromptBuilder promptBuilder = const RagPromptBuilder(),
-    ChatIntentRouter intentRouter = const DeterministicChatIntentRouter(),
     ConversationalPromptBuilder conversationalPromptBuilder =
         const ConversationalPromptBuilder(),
     RetrievedKnowledgeRelevance relevance = const RetrievedKnowledgeRelevance(),
@@ -56,7 +52,6 @@ class AskQuestionUseCase {
        _llmService = llmService,
        _contextBuilder = contextBuilder,
        _promptBuilder = promptBuilder,
-       _intentRouter = intentRouter,
        _conversationalPromptBuilder = conversationalPromptBuilder,
        _relevance = relevance,
        _responseConfiguration = responseConfiguration,
@@ -68,7 +63,6 @@ class AskQuestionUseCase {
   final LocalLlmService _llmService;
   final DocumentContextBuilder _contextBuilder;
   final RagPromptBuilder _promptBuilder;
-  final ChatIntentRouter _intentRouter;
   final ConversationalPromptBuilder _conversationalPromptBuilder;
   final RetrievedKnowledgeRelevance _relevance;
   final ChatResponseConfiguration _responseConfiguration;
@@ -128,29 +122,12 @@ class AskQuestionUseCase {
     }
     _debugLog('questionCharacters=${question.length}');
     _debugLog('historyMessageCount=${history.length}');
-    profile?.mark(AiProfileEvent.routerStart);
-    final ChatRoute route;
-    try {
-      route = await _routeQuestion(question, history);
-    } finally {
-      profile?.mark(AiProfileEvent.routerEnd);
-    }
-    profile?.route = route.label;
-    _debugLog('route=${route.label}');
-    final answers = switch (route) {
-      ChatRoute.chat => _handleChatRequest(
-        question,
-        history,
-        onGenerationComplete,
-      ),
-      ChatRoute.knowledge => _handleKnowledgeRequest(
-        question,
-        history,
-        onGenerationComplete,
-      ),
-    };
     QuestionAnswer? lastAnswer;
-    await for (final answer in answers) {
+    await for (final answer in _handleKnowledgeRequest(
+      question,
+      history,
+      onGenerationComplete,
+    )) {
       lastAnswer = answer;
       yield answer;
     }
@@ -187,10 +164,11 @@ class AskQuestionUseCase {
     final prompt = _conversationalPromptBuilder.build(
       question,
       history: history,
+      boundaryMessage: _responseConfiguration.unsupportedQuestionMessage,
     );
     profile?.mark(AiProfileEvent.promptBuildEnd);
     if (profile != null) profile.chatPromptCharacters = prompt.length;
-    _debugLog('FALLBACK:\nfalse');
+    _debugLog('FALLBACK:\ntrue');
     yield* _generateResponse(prompt, const [], onGenerationComplete);
   }
 
@@ -200,6 +178,7 @@ class AskQuestionUseCase {
     void Function(Duration)? onGenerationComplete,
   ) async* {
     final profile = AiLatencyProfile.current;
+    profile?.route = 'KNOWLEDGE';
     profile?.mark(AiProfileEvent.retrievalQueryStart);
     final retrievalQuery =
         (_retrievalQueryBuilder ?? const RetrievalQueryBuilder()).build(
@@ -233,11 +212,7 @@ class AskQuestionUseCase {
     _debugLog('groundedCount=${documents.length}');
     if (documents.isEmpty) {
       _debugLog('FALLBACK:\ntrue');
-      _debugLog('FINAL GENERATION:\nfalse');
-      yield QuestionAnswer(
-        status: QuestionAnswerStatus.noRelevantKnowledge,
-        answer: _responseConfiguration.unsupportedQuestionMessage,
-      );
+      yield* _handleChatRequest(question, history, onGenerationComplete);
       return;
     }
 
@@ -260,20 +235,6 @@ class AskQuestionUseCase {
   void _debugLog(String message) {
     if (kDebugMode) {
       debugPrint('[Chat] $message');
-    }
-  }
-
-  Future<ChatRoute> _routeQuestion(
-    String question,
-    List<ConversationMessage> history,
-  ) async {
-    try {
-      if (_intentRouter case final HistoryAwareChatIntentRouter router) {
-        return await router.routeWithHistory(question, history: history);
-      }
-      return await _intentRouter.route(question);
-    } catch (_) {
-      return ChatRoute.knowledge;
     }
   }
 

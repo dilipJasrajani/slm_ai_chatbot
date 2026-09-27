@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/app/app.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/chat_intent_router.dart';
-import 'package:slm_ai_chatbot/features/chat/domain/chat_route.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_page.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/chat_controller.dart';
@@ -97,7 +95,6 @@ void main() {
         modelManager: modelManager,
         askQuestion: _askQuestion(
           _FakeLlmService(() => Stream.value('Welcome!')),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
         ),
         chatConfiguration: AiChatConfiguration(
           assistantName: 'Koko AI',
@@ -371,7 +368,6 @@ void main() {
         askQuestion: _askQuestion(
           _FakeLlmService(() => response.stream),
           repository: repository,
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
         ),
         chatConfiguration: const AiChatConfiguration(
           sourceSectionLabel: 'References',
@@ -433,7 +429,6 @@ void main() {
         askQuestion: _askQuestion(
           _FakeLlmService(() => Stream.value('Hello!')),
           repository: repository,
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
         ),
       ),
     );
@@ -446,7 +441,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Sources'), findsNothing);
-    expect(repository.searchCount, 0);
+    expect(repository.searchCount, 1);
 
     await tester.pumpWidget(const SizedBox.shrink());
     final emptyRepository = _FakeRagRepository(const []);
@@ -456,14 +451,17 @@ void main() {
         askQuestion: _askQuestion(
           _FakeLlmService(() => Stream.value('unused')),
           repository: emptyRepository,
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
         ),
       ),
     );
     await tester.enterText(find.byType(TextField), 'Unrelated question');
     await tester.tap(find.byTooltip('Send message'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.text('unused'), findsOneWidget);
+    expect(
+      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
+      findsOneWidget,
+    );
     expect(find.textContaining('Sources'), findsNothing);
     expect(emptyRepository.searchCount, 1);
     await modelManager.dispose();
@@ -479,7 +477,6 @@ void main() {
         modelManager: modelManager,
         askQuestion: _askQuestion(
           _FakeLlmService(() => Stream.value('Check Wi-Fi.')),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
         ),
         chatConfiguration: const AiChatConfiguration(showLocalSources: false),
       ),
@@ -506,7 +503,6 @@ void main() {
         modelManager: modelManager,
         askQuestion: _askQuestion(
           _FakeLlmService(() => Stream.value('Check Wi-Fi.')),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.knowledge),
         ),
         chatConfiguration: const AiChatConfiguration(showGenerationTime: false),
       ),
@@ -528,7 +524,6 @@ void main() {
         modelManager: modelManager,
         askQuestion: _askQuestion(
           _FakeLlmService(() => Stream.value('Hello!')),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
         ),
         chatConfiguration: const AiChatConfiguration(
           generationTimeLabel: 'Completed in',
@@ -722,7 +717,6 @@ void main() {
       await modelManager.ensureReady();
       final askQuestion = _askQuestion(
         _FakeLlmService(() => Stream.value('Dark mode answer.')),
-        intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
       );
       final darkTheme = ThemeData.dark();
       Widget app(ThemeData theme) => MaterialApp(
@@ -1391,7 +1385,6 @@ void main() {
                 _ => Stream.value('Recovered answer'),
               };
             }),
-            intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
           ),
         ),
       );
@@ -1448,10 +1441,7 @@ void main() {
     await tester.pumpWidget(
       MyApp(
         modelManager: modelManager,
-        askQuestion: _askQuestion(
-          _FakeLlmService(() => response.stream),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
-        ),
+        askQuestion: _askQuestion(_FakeLlmService(() => response.stream)),
       ),
     );
     await tester.enterText(find.byType(TextField), 'Show a code example');
@@ -1697,115 +1687,114 @@ void main() {
     await modelManager.dispose();
   });
 
-  testWidgets('retrieval Retry reroutes in place with Markdown and sources', (
-    tester,
-  ) async {
-    String? clipboardText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          clipboardText =
-              (call.arguments as Map<Object?, Object?>)['text'] as String;
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+  testWidgets(
+    'retrieval Retry searches again in place with Markdown and sources',
+    (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
-        null,
-      ),
-    );
-    final modelManager = LocalModelManager(_ReadyModelRepository());
-    await modelManager.ensureReady();
-    final secondSearch = Completer<void>();
-    final repository = _RetryableRagRepository(secondSearch.future);
-    final router = _CountingChatIntentRouter();
-    var generationCount = 0;
-    const answer =
-        '## Fix\n\n- Check `E123`\n\n```dart\nfinal fixed = true;\n```';
-    await tester.pumpWidget(
-      MyApp(
-        modelManager: modelManager,
-        askQuestion: _askQuestion(
-          _FakeLlmService(() {
-            generationCount++;
-            return Stream.value(answer);
-          }),
-          repository: repository,
-          intentRouter: router,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            clipboardText =
+                (call.arguments as Map<Object?, Object?>)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
         ),
-      ),
-    );
-    const question = 'How do I troubleshoot a network connection?';
-    await tester.enterText(find.byType(TextField), question);
-    await tester.tap(find.byTooltip('Send message'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Unable to search the local knowledge base.'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('Exception:'), findsNothing);
-    expect(find.text(question), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
-    expect(find.byTooltip('Copy response'), findsNothing);
-    expect(find.byTooltip('Regenerate response'), findsNothing);
-    expect(generationCount, 0);
+      );
+      final modelManager = LocalModelManager(_ReadyModelRepository());
+      await modelManager.ensureReady();
+      final secondSearch = Completer<void>();
+      final repository = _RetryableRagRepository(secondSearch.future);
+      var generationCount = 0;
+      const answer =
+          '## Fix\n\n- Check `E123`\n\n```dart\nfinal fixed = true;\n```';
+      await tester.pumpWidget(
+        MyApp(
+          modelManager: modelManager,
+          askQuestion: _askQuestion(
+            _FakeLlmService(() {
+              generationCount++;
+              return Stream.value(answer);
+            }),
+            repository: repository,
+          ),
+        ),
+      );
+      const question = 'How do I troubleshoot a network connection?';
+      await tester.enterText(find.byType(TextField), question);
+      await tester.tap(find.byTooltip('Send message'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Unable to search the local knowledge base.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Exception:'), findsNothing);
+      expect(find.text(question), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.byTooltip('Copy response'), findsNothing);
+      expect(find.byTooltip('Regenerate response'), findsNothing);
+      expect(generationCount, 0);
 
-    final retryButton = tester.widget<TextButton>(
-      find.ancestor(
-        of: find.text('Retry'),
-        matching: find.byWidgetPredicate((widget) => widget is TextButton),
-      ),
-    );
-    await tester.tap(find.text('Retry'));
-    retryButton.onPressed!();
-    await tester.pump();
-    await tester.pump();
-    expect(find.text('Thinking…'), findsOneWidget);
-    expect(find.text('Retry'), findsNothing);
-    expect(
-      tester
-          .widget<IconButton>(
-            find.byWidgetPredicate(
-              (widget) =>
-                  widget is IconButton && widget.tooltip == 'Send message',
-            ),
-          )
-          .onPressed,
-      isNull,
-    );
-    expect(find.text(question), findsOneWidget);
-    expect(find.byType(AiAvatar), findsOneWidget);
-    expect(repository.attempts, 2);
-    secondSearch.complete();
-    await tester.pumpAndSettle();
-    expect(find.text('Retry'), findsNothing);
-    expect(find.text('Fix'), findsOneWidget);
-    expect(find.text('final fixed = true;'), findsOneWidget);
-    expect(find.byTooltip('Copy code'), findsOneWidget);
-    expect(find.byTooltip('Copy response'), findsOneWidget);
-    expect(find.byTooltip('Regenerate response'), findsOneWidget);
-    expect(find.text('Sources · 1'), findsOneWidget);
-    expect(find.text('Device network connection guide'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
-    expect(find.text(question), findsOneWidget);
-    expect(find.byType(AiAvatar), findsOneWidget);
-    expect(router.calls, 2);
-    expect(generationCount, 1);
-    await tester.tap(find.byTooltip('Copy response'));
-    await tester.pump();
-    expect(clipboardText, answer);
-    await tester.tap(find.byTooltip('Copy code'));
-    await tester.pump();
-    expect(clipboardText, 'final fixed = true;');
-    expect(tester.takeException(), isNull);
-    await modelManager.dispose();
-  });
+      final retryButton = tester.widget<TextButton>(
+        find.ancestor(
+          of: find.text('Retry'),
+          matching: find.byWidgetPredicate((widget) => widget is TextButton),
+        ),
+      );
+      await tester.tap(find.text('Retry'));
+      retryButton.onPressed!();
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Thinking…'), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (widget) =>
+                    widget is IconButton && widget.tooltip == 'Send message',
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.text(question), findsOneWidget);
+      expect(find.byType(AiAvatar), findsOneWidget);
+      expect(repository.attempts, 2);
+      secondSearch.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Retry'), findsNothing);
+      expect(find.text('Fix'), findsOneWidget);
+      expect(find.text('final fixed = true;'), findsOneWidget);
+      expect(find.byTooltip('Copy code'), findsOneWidget);
+      expect(find.byTooltip('Copy response'), findsOneWidget);
+      expect(find.byTooltip('Regenerate response'), findsOneWidget);
+      expect(find.text('Sources · 1'), findsOneWidget);
+      expect(find.text('Device network connection guide'), findsOneWidget);
+      expect(
+        find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
+        findsOneWidget,
+      );
+      expect(find.text(question), findsOneWidget);
+      expect(find.byType(AiAvatar), findsOneWidget);
+      expect(repository.attempts, 2);
+      expect(generationCount, 1);
+      await tester.tap(find.byTooltip('Copy response'));
+      await tester.pump();
+      expect(clipboardText, answer);
+      await tester.tap(find.byTooltip('Copy code'));
+      await tester.pump();
+      expect(clipboardText, 'final fixed = true;');
+      expect(tester.takeException(), isNull);
+      await modelManager.dispose();
+    },
+  );
 
   testWidgets('failed Retry restores a friendly error and can be repeated', (
     tester,
@@ -1829,7 +1818,6 @@ void main() {
               _ => Stream.value('Recovered answer'),
             };
           }),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
         ),
       ),
     );
@@ -1886,7 +1874,6 @@ void main() {
               _ => Stream.value('Recovered older answer'),
             };
           }),
-          intentRouter: const _FixedChatIntentRouter(ChatRoute.chat),
         ),
       ),
     );
@@ -2031,7 +2018,7 @@ void main() {
     },
   );
 
-  testWidgets('unsupported knowledge answer remains a normal response', (
+  testWidgets('ungrounded generated answer remains a normal response', (
     tester,
   ) async {
     final modelManager = LocalModelManager(_ReadyModelRepository());
@@ -2041,7 +2028,9 @@ void main() {
       MyApp(
         modelManager: modelManager,
         askQuestion: _askQuestion(
-          _FakeLlmService(() => Stream.value('unused')),
+          _FakeLlmService(
+            () => Stream.value(configuration.unsupportedQuestionMessage),
+          ),
           repository: _FakeRagRepository(const []),
         ),
       ),
@@ -2144,23 +2133,11 @@ class _MessagesController extends ChatController {
 AskQuestionUseCase _askQuestion(
   _FakeLlmService llmService, {
   _FakeRagRepository? repository,
-  ChatIntentRouter? intentRouter,
 }) {
   return AskQuestionUseCase(
     ragRepository: repository ?? _FakeRagRepository(),
     llmService: llmService,
-    intentRouter:
-        intentRouter ?? const _FixedChatIntentRouter(ChatRoute.knowledge),
   );
-}
-
-class _FixedChatIntentRouter implements ChatIntentRouter {
-  const _FixedChatIntentRouter(this.routeValue);
-
-  final ChatRoute routeValue;
-
-  @override
-  Future<ChatRoute> route(String message) async => routeValue;
 }
 
 class _ReadyModelRepository implements LocalModelRepository {
@@ -2244,16 +2221,6 @@ class _RetryableRagRepository extends _FakeRagRepository {
     }
     await secondSearch;
     return super.search(query: query, topK: topK, threshold: threshold);
-  }
-}
-
-class _CountingChatIntentRouter implements ChatIntentRouter {
-  int calls = 0;
-
-  @override
-  Future<ChatRoute> route(String message) async {
-    calls++;
-    return ChatRoute.knowledge;
   }
 }
 

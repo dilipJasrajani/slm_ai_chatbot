@@ -77,7 +77,6 @@ Future<AppDependencies> createAppDependencies() async {
   final askQuestion = AskQuestionUseCase(
     ragRepository: ragRepository,
     llmService: llmService,
-    intentRouter: chatIntentRouter,
     responseConfiguration: ChatResponseConfiguration(
       greetingMessage: chatConfiguration.greetingMessage,
       wellbeingMessage: chatConfiguration.wellbeingMessage,

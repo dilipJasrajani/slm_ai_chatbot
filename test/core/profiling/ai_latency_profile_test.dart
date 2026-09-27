@@ -17,69 +17,67 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
-  test(
-    'CHAT records prompt, history and generation without retrieval',
-    () async {
-      final logs = <String>[];
-      final profile = AiLatencyProfile(requestNumber: 1, log: logs.add);
-      final history = InMemoryConversationHistory()
-        ..addAll(const [
-          ConversationMessage(
-            author: ConversationAuthor.user,
-            text: 'Secret prior',
-          ),
-          ConversationMessage(
-            author: ConversationAuthor.assistant,
-            text: 'Previous',
-          ),
-        ]);
-      final rag = _Rag();
-      final llm = _Llm(() => Stream.fromIterable(['Hello', ' there ']));
-      final useCase = AskQuestionUseCase(
-        ragRepository: rag,
-        llmService: llm,
-        intentRouter: const _Route(ChatRoute.chat),
-        conversationHistory: history,
-      );
-      const question = 'Private question xyz';
-      final answers = await AiLatencyProfile.run(
-        profile,
-        () async => useCase.stream(question).toList(),
-      );
-      profile.complete(answers.last.status.name);
-      profile.complete('ignored');
-
-      expect(answers.map((answer) => answer.answer), [
-        'Hello',
-        'Hello there ',
-        'Hello there',
+  test('CHAT records retrieval, prompt, history and generation', () async {
+    final logs = <String>[];
+    final profile = AiLatencyProfile(requestNumber: 1, log: logs.add);
+    final history = InMemoryConversationHistory()
+      ..addAll(const [
+        ConversationMessage(
+          author: ConversationAuthor.user,
+          text: 'Secret prior',
+        ),
+        ConversationMessage(
+          author: ConversationAuthor.assistant,
+          text: 'Previous',
+        ),
       ]);
-      expect(answers.last.documents, isEmpty);
-      expect(rag.searches, 0);
-      expect(profile.route, 'CHAT');
-      expect(profile.historyMessageCount, 2);
-      expect(profile.historyCharacters, greaterThan(0));
-      expect(profile.userQueryCharacters, question.length);
-      expect(profile.chatPromptCharacters, llm.prompt!.length);
-      expect(profile.ragPromptCharacters, isNull);
-      expect(profile.elapsedAt(AiProfileEvent.routerStart), isNotNull);
-      expect(profile.elapsedAt(AiProfileEvent.routerEnd), isNotNull);
-      expect(profile.elapsedAt(AiProfileEvent.promptBuildEnd), isNotNull);
-      expect(profile.elapsedAt(AiProfileEvent.finalLlmStart), isNotNull);
-      expect(profile.elapsedAt(AiProfileEvent.finalLlmEnd), isNotNull);
-      expect(profile.elapsedAt(AiProfileEvent.searchStart), isNull);
-      expect(
-        logs.where((line) => line.contains('Request complete')),
-        hasLength(1),
-      );
-      expect(logs.join('\n'), contains('route=CHAT, status=answered'));
-      expect(logs.join('\n'), contains('Router native metrics: Not available'));
-      expect(logs.join('\n'), contains('Final native metrics: Not available'));
-      expect(logs.join('\n'), isNot(contains(question)));
-      expect(logs.join('\n'), isNot(contains('Secret prior')));
-      expect(logs.join('\n'), isNot(contains('Hello there')));
-    },
-  );
+    final rag = _Rag();
+    final llm = _Llm(() => Stream.fromIterable(['Hello', ' there ']));
+    final useCase = AskQuestionUseCase(
+      ragRepository: rag,
+      llmService: llm,
+      conversationHistory: history,
+    );
+    const question = 'Private question xyz';
+    final answers = await AiLatencyProfile.run(
+      profile,
+      () async => useCase.stream(question).toList(),
+    );
+    profile.complete(answers.last.status.name);
+    profile.complete('ignored');
+
+    expect(answers.map((answer) => answer.answer), [
+      'Hello',
+      'Hello there ',
+      'Hello there',
+    ]);
+    expect(answers.last.documents, isEmpty);
+    expect(rag.searches, 1);
+    expect(profile.route, 'KNOWLEDGE');
+    expect(profile.historyMessageCount, 2);
+    expect(profile.historyCharacters, greaterThan(0));
+    expect(profile.userQueryCharacters, question.length);
+    expect(profile.chatPromptCharacters, llm.prompt!.length);
+    expect(profile.ragPromptCharacters, isNull);
+    expect(profile.elapsedAt(AiProfileEvent.routerStart), isNull);
+    expect(profile.elapsedAt(AiProfileEvent.routerEnd), isNull);
+    expect(profile.elapsedAt(AiProfileEvent.promptBuildEnd), isNotNull);
+    expect(profile.elapsedAt(AiProfileEvent.finalLlmStart), isNotNull);
+    expect(profile.elapsedAt(AiProfileEvent.finalLlmEnd), isNotNull);
+    expect(profile.elapsedAt(AiProfileEvent.searchStart), isNotNull);
+    expect(profile.elapsedAt(AiProfileEvent.searchEnd), isNotNull);
+    expect(
+      logs.where((line) => line.contains('Request complete')),
+      hasLength(1),
+    );
+    expect(logs.join('\n'), contains('route=KNOWLEDGE, status=answered'));
+    expect(logs.join('\n'), contains('Results: retrieved=0, grounded=0'));
+    expect(profile.routerPromptCharacters, isNull);
+    expect(logs.join('\n'), contains('Final native metrics: Not available'));
+    expect(logs.join('\n'), isNot(contains(question)));
+    expect(logs.join('\n'), isNot(contains('Secret prior')));
+    expect(logs.join('\n'), isNot(contains('Hello there')));
+  });
 
   test(
     'KNOWLEDGE profiles search and decode without changing grounded answer',
@@ -92,11 +90,7 @@ void main() {
         runtime: runtime,
       );
       final llm = _Llm(() => Stream.value('Check Wi-Fi.'));
-      final useCase = AskQuestionUseCase(
-        ragRepository: rag,
-        llmService: llm,
-        intentRouter: const _Route(ChatRoute.knowledge),
-      );
+      final useCase = AskQuestionUseCase(ragRepository: rag, llmService: llm);
       const question = 'How do I fix E123 network?';
       final answers = await AiLatencyProfile.run(
         profile,
@@ -110,6 +104,10 @@ void main() {
       expect(runtime.query, question);
       expect(runtime.topK, 3);
       expect(profile.route, 'KNOWLEDGE');
+      expect(profile.elapsedAt(AiProfileEvent.routerStart), isNull);
+      expect(profile.elapsedAt(AiProfileEvent.routerEnd), isNull);
+      expect(profile.routerPromptCharacters, isNull);
+      expect(llm.calls, 1);
       expect(profile.retrievedCount, 1);
       expect(profile.groundedCount, 1);
       expect(profile.retrievedContextCharacters, greaterThan(0));
@@ -143,17 +141,13 @@ void main() {
   );
 
   test(
-    'unsupported and retrieval errors stop before final generation',
+    'empty retrieval generates once but retrieval errors stop generation',
     () async {
       for (final failing in [false, true]) {
         final profile = AiLatencyProfile(requestNumber: 3, log: (_) {});
         final rag = _Rag(failing: failing);
-        final llm = _Llm(() => Stream.value('Should not run'));
-        final useCase = AskQuestionUseCase(
-          ragRepository: rag,
-          llmService: llm,
-          intentRouter: const _Route(ChatRoute.knowledge),
-        );
+        final llm = _Llm(() => Stream.value('Generated fallback'));
+        final useCase = AskQuestionUseCase(ragRepository: rag, llmService: llm);
         final answers = await AiLatencyProfile.run(
           profile,
           () async => useCase.stream('Unrelated question').toList(),
@@ -163,13 +157,21 @@ void main() {
           answers.single.status,
           failing
               ? QuestionAnswerStatus.retrievalFailure
-              : QuestionAnswerStatus.noRelevantKnowledge,
+              : QuestionAnswerStatus.answered,
         );
+        expect(profile.route, 'KNOWLEDGE');
         expect(profile.retrievedCount, failing ? isNull : 0);
         expect(profile.groundedCount, failing ? isNull : 0);
         expect(profile.elapsedAt(AiProfileEvent.searchEnd), isNotNull);
-        expect(profile.elapsedAt(AiProfileEvent.finalLlmStart), isNull);
-        expect(llm.prompt, isNull);
+        expect(
+          profile.elapsedAt(AiProfileEvent.finalLlmStart),
+          failing ? isNull : isNotNull,
+        );
+        expect(llm.calls, failing ? 0 : 1);
+        expect(
+          llm.prompt,
+          failing ? isNull : contains('respond with exactly:'),
+        );
       }
     },
   );
@@ -185,7 +187,6 @@ void main() {
         final useCase = AskQuestionUseCase(
           ragRepository: _Rag(),
           llmService: _Llm(() => Stream.error(error)),
-          intentRouter: const _Route(ChatRoute.chat),
         );
         final answers = await AiLatencyProfile.run(
           profile,
@@ -250,7 +251,6 @@ void main() {
       final useCase = AskQuestionUseCase(
         ragRepository: _Rag(),
         llmService: _Llm(() => Stream.value('Hello')),
-        intentRouter: const _Route(ChatRoute.chat),
       );
       expect(AiLatencyProfile.current, isNull);
       await AiLatencyProfile.run(
@@ -379,9 +379,11 @@ class _Llm implements LocalLlmService {
   _Llm(this.respond);
   final Stream<String> Function() respond;
   String? prompt;
+  int calls = 0;
   @override
   Stream<String> generate(String prompt) {
     this.prompt = prompt;
+    calls++;
     return respond();
   }
 
