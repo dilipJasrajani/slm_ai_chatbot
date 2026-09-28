@@ -114,6 +114,9 @@ LocalModelRepositoryImpl
 status. `LocalModelRepositoryImpl` performs the current local Qwen3 install
 and active-model loading. The composition root shares that loaded model with
 the local LLM service without making chat or RAG code depend on the model SDK.
+The Qwen3 runtime uses a 2048-token context so retrieved knowledge and a
+short answer fit together; its session prompt includes `/no_think` so the
+model does not spend its response budget on hidden reasoning.
 
 ## Local RAG
 

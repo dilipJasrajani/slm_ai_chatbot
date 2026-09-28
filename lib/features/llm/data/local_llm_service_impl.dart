@@ -37,7 +37,10 @@ class LocalLlmServiceImpl implements LocalLlmService {
     _activeSession = session;
 
     try {
-      await session.addQueryChunk(Message(text: prompt, isUser: true));
+      // Direct sessions do not add Qwen3's /no_think directive like Chat does.
+      await session.addQueryChunk(
+        Message(text: '$prompt /no_think', isUser: true),
+      );
       final rawOutput = _logRawOutput(
         session.getResponseAsync(),
         profile: profile,

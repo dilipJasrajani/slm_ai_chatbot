@@ -214,30 +214,27 @@ void main() {
     },
   );
 
-  test(
-    'missing native metrics do not prevent LiteRT-like session output',
-    () async {
-      final session = _Session();
-      final service = LocalLlmServiceImpl(
-        modelProvider: () async => _Model(session),
-        releaseModel: () async {},
-      );
-      final logs = <String>[];
-      final profile = AiLatencyProfile(requestNumber: 7, log: logs.add);
-      final chunks = await AiLatencyProfile.run(profile, () async {
-        profile.generationPhase = AiGenerationPhase.finalAnswer;
-        return service.generate('Sensitive prompt').toList();
-      });
-      profile.complete('answered');
-      expect(chunks.join(), 'Generated text');
-      expect(session.query, 'Sensitive prompt');
-      expect(session.closed, isTrue);
-      expect(profile.elapsedAt(AiProfileEvent.firstRawChunk), isNotNull);
-      expect(profile.elapsedAt(AiProfileEvent.firstParsedChunk), isNotNull);
-      expect(logs.join('\n'), contains('Final native metrics: Not available'));
-      expect(logs.join('\n'), isNot(contains('Sensitive prompt')));
-    },
-  );
+  test('direct LiteRT session requests a non-thinking Qwen response', () async {
+    final session = _Session();
+    final service = LocalLlmServiceImpl(
+      modelProvider: () async => _Model(session),
+      releaseModel: () async {},
+    );
+    final logs = <String>[];
+    final profile = AiLatencyProfile(requestNumber: 7, log: logs.add);
+    final chunks = await AiLatencyProfile.run(profile, () async {
+      profile.generationPhase = AiGenerationPhase.finalAnswer;
+      return service.generate('Sensitive prompt').toList();
+    });
+    profile.complete('answered');
+    expect(chunks.join(), 'Generated text');
+    expect(session.query, 'Sensitive prompt /no_think');
+    expect(session.closed, isTrue);
+    expect(profile.elapsedAt(AiProfileEvent.firstRawChunk), isNotNull);
+    expect(profile.elapsedAt(AiProfileEvent.firstParsedChunk), isNotNull);
+    expect(logs.join('\n'), contains('Final native metrics: Not available'));
+    expect(logs.join('\n'), isNot(contains('Sensitive prompt')));
+  });
 
   test('reads native counts and TTFT before closing the session', () async {
     final session = _Session(

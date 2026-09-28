@@ -281,13 +281,15 @@ class AskQuestionUseCase {
           documents: documents,
         );
       }
-    } on StateError {
+    } on StateError catch (error) {
+      _debugLog('Local generation unavailable: $error');
       yield QuestionAnswer(
         status: QuestionAnswerStatus.modelUnavailable,
         answer: 'Local AI model is not installed or could not be loaded.',
         documents: documents,
       );
-    } catch (_) {
+    } catch (error) {
+      _debugLog('Local generation failed: $error');
       yield QuestionAnswer(
         status: QuestionAnswerStatus.generationFailure,
         answer: 'Unable to generate an answer with the local AI model.',

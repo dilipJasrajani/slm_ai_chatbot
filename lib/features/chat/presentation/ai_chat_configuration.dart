@@ -119,12 +119,12 @@ class AiChatConfiguration {
     this.showModelLabel = true,
     this.showRuntimeBackend = true,
     this.showGenerationTime = true,
-    this.generationTimeLabel = 'Generated in',
+    this.generationTimeLabel = '',
     this.showCopyAction = true,
     this.showRegenerateAction = true,
     this.showRetryAction = true,
     this.scrollThreshold = 160,
-    this.maxHistoryMessages = 4,
+    this.maxHistoryMessages = 3,
   });
 
   final String title;

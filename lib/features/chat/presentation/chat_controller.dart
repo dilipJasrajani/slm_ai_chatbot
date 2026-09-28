@@ -21,13 +21,13 @@ class ChatController extends ChangeNotifier {
        _prepareKnowledgeBase = prepareKnowledgeBase,
        _state = ChatState(
          modelState: modelManager.state,
-         isPreparingKnowledge: prepareKnowledgeBase != null,
          knowledgeReady: prepareKnowledgeBase == null,
        ) {
     _modelSubscription = _modelManager.states.listen(_onModelState);
-    unawaited(_modelManager.ensureReady());
-    if (_prepareKnowledgeBase != null) {
-      unawaited(_prepareKnowledge());
+    if (_modelManager.state.status == ModelStatus.ready) {
+      _startKnowledgePreparation();
+    } else {
+      unawaited(_modelManager.ensureReady());
     }
   }
 
@@ -40,8 +40,20 @@ class ChatController extends ChangeNotifier {
   var _requestSequence = 0;
   final _pendingRenderedProfiles = <String, AiLatencyProfile>{};
   var _disposed = false;
+  var _knowledgePreparationStarted = false;
 
   ChatState get state => _state;
+
+  void _startKnowledgePreparation() {
+    if (_disposed ||
+        _knowledgePreparationStarted ||
+        _prepareKnowledgeBase == null) {
+      return;
+    }
+    _knowledgePreparationStarted = true;
+    _setState(state.copyWith(isPreparingKnowledge: true));
+    unawaited(_prepareKnowledge());
+  }
 
   Future<void> _prepareKnowledge() async {
     try {
@@ -289,6 +301,9 @@ class ChatController extends ChangeNotifier {
 
   void _onModelState(ModelState modelState) {
     _setState(state.copyWith(modelState: modelState));
+    if (modelState.status == ModelStatus.ready) {
+      _startKnowledgePreparation();
+    }
   }
 
   void _replaceMessage(

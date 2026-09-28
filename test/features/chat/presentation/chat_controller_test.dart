@@ -10,12 +10,163 @@ import 'package:slm_ai_chatbot/features/chat/presentation/chat_models.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';
+import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_document.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
+  test('prepares knowledge only after the model finishes loading', () async {
+    final repository = _StagedModelRepository();
+    final modelManager = LocalModelManager(repository);
+    final knowledgePrepared = Completer<void>();
+    var preparationCalls = 0;
+    final controller = ChatController(
+      modelManager: modelManager,
+      askQuestion: AskQuestionUseCase(
+        ragRepository: _RagRepository(),
+        llmService: _LlmService(Stream.value('Answer')),
+      ),
+      prepareKnowledgeBase: () {
+        preparationCalls++;
+        return knowledgePrepared.future;
+      },
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    expect(modelManager.state.status, ModelStatus.downloading);
+    expect(controller.state.isPreparingKnowledge, isFalse);
+    expect(controller.state.canSend, isFalse);
+    expect(preparationCalls, 0);
+
+    repository.finishDownload.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(modelManager.state.status, ModelStatus.loading);
+    expect(controller.state.isPreparingKnowledge, isFalse);
+    expect(preparationCalls, 0);
+
+    repository.finishLoading.complete();
+    await modelManager.ensureReady();
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.state.isPreparingKnowledge, isTrue);
+    expect(controller.state.canSend, isFalse);
+    expect(preparationCalls, 1);
+
+    knowledgePrepared.complete();
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.state.knowledgeReady, isTrue);
+    expect(controller.state.isPreparingKnowledge, isFalse);
+    expect(controller.state.canSend, isTrue);
+
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
+  test(
+    'waits for a successful model retry before preparing knowledge',
+    () async {
+      final repository = _StagedModelRepository(failFirstDownload: true);
+      final modelManager = LocalModelManager(repository);
+      var preparationCalls = 0;
+      final controller = ChatController(
+        modelManager: modelManager,
+        askQuestion: AskQuestionUseCase(
+          ragRepository: _RagRepository(),
+          llmService: _LlmService(Stream.value('Answer')),
+        ),
+        prepareKnowledgeBase: () async {
+          preparationCalls++;
+        },
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.modelState.status, ModelStatus.error);
+      expect(controller.state.isPreparingKnowledge, isFalse);
+      expect(preparationCalls, 0);
+
+      final retry = controller.retryModelInitialization();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.modelState.status, ModelStatus.downloading);
+      expect(preparationCalls, 0);
+      repository.finishDownload.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.modelState.status, ModelStatus.loading);
+      expect(preparationCalls, 0);
+      repository.finishLoading.complete();
+      await retry;
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.knowledgeReady, isTrue);
+      expect(preparationCalls, 1);
+
+      controller.dispose();
+      await modelManager.dispose();
+    },
+  );
+
+  test('prepares once when the model is already ready', () async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    var preparationCalls = 0;
+    final controller = ChatController(
+      modelManager: modelManager,
+      askQuestion: AskQuestionUseCase(
+        ragRepository: _RagRepository(),
+        llmService: _LlmService(Stream.value('Answer')),
+      ),
+      prepareKnowledgeBase: () async {
+        preparationCalls++;
+      },
+    );
+
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.state.knowledgeReady, isTrue);
+    expect(preparationCalls, 1);
+    await modelManager.ensureReady();
+    expect(preparationCalls, 1);
+
+    controller.dispose();
+    await modelManager.dispose();
+  });
+
+  testWidgets('shows knowledge preparation after model loading, not download', (
+    tester,
+  ) async {
+    final repository = _StagedModelRepository();
+    final modelManager = LocalModelManager(repository);
+    final knowledgePrepared = Completer<void>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiChatPage(
+          modelManager: modelManager,
+          askQuestion: AskQuestionUseCase(
+            ragRepository: _RagRepository(),
+            llmService: _LlmService(Stream.value('Answer')),
+          ),
+          prepareKnowledgeBase: () => knowledgePrepared.future,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.textContaining('Downloading local AI model'), findsOneWidget);
+    expect(find.textContaining('Preparing local knowledge'), findsNothing);
+
+    repository.finishDownload.complete();
+    await tester.pump();
+    expect(find.textContaining('Preparing local knowledge'), findsNothing);
+
+    repository.finishLoading.complete();
+    await tester.pump();
+    expect(find.textContaining('Preparing local knowledge'), findsOneWidget);
+
+    knowledgePrepared.complete();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Preparing local knowledge'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    await modelManager.dispose();
+  });
+
   testWidgets('visible assistant text is recorded after the chat frame', (
     tester,
   ) async {
@@ -462,6 +613,30 @@ class _ReadyModelRepository implements LocalModelRepository {
 
   @override
   Future<void> load() async {}
+}
+
+class _StagedModelRepository implements LocalModelRepository {
+  _StagedModelRepository({this.failFirstDownload = false});
+
+  final bool failFirstDownload;
+  final finishDownload = Completer<void>();
+  final finishLoading = Completer<void>();
+  var downloadCalls = 0;
+
+  @override
+  Future<bool> isInstalled() async => false;
+
+  @override
+  Future<void> download({required void Function(int progress) onProgress}) {
+    downloadCalls++;
+    if (failFirstDownload && downloadCalls == 1) {
+      throw StateError('Download failed');
+    }
+    return finishDownload.future;
+  }
+
+  @override
+  Future<void> load() => finishLoading.future;
 }
 
 class _LlmService implements LocalLlmService {

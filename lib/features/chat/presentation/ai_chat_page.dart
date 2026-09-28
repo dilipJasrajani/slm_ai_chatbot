@@ -858,7 +858,7 @@ class _ChatBubble extends StatelessWidget {
                 ),
                 if (showTime || showCopy || showRegenerate)
                   Padding(
-                    padding: EdgeInsets.only(top: theme.spacing * .4),
+                    padding: EdgeInsets.only(top: theme.spacing * .01),
                     child: Wrap(
                       spacing: theme.spacing * .5,
                       runSpacing: theme.spacing * .25,
