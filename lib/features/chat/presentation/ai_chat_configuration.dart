@@ -110,10 +110,10 @@ class AiChatConfiguration {
         "I'm an AI assistant designed to help with technical information "
         "available in my knowledge base. I can't answer that question.",
     this.suggestions = const [
-      'What does error E123 mean?',
-      'How do I troubleshoot a network connection?',
+      'What does error F.94 mean?',
+      'How do I troubleshoot a Communication error PlusBus?',
     ],
-    this.showLocalSources = false,
+    this.showLocalSources = true,
     this.sourceSectionLabel = 'Sources',
     this.modelLabel = 'Qwen3 0.6B \u00B7 Local',
     this.showModelLabel = true,

@@ -528,9 +528,9 @@ void main() {
     expect(ungroundedMessage.sources, isEmpty);
     expect(find.textContaining('Sources'), findsNothing);
     expect(find.text('Device cannot connect to network'), findsNothing);
-    final ungroundedHeight = tester.getSize(
-      find.byKey(ValueKey(ungroundedMessage.id)),
-    ).height;
+    final ungroundedHeight = tester
+        .getSize(find.byKey(ValueKey(ungroundedMessage.id)))
+        .height;
 
     repository.results = const [];
     await controller.send('Hi');
@@ -551,7 +551,10 @@ void main() {
     expect(groundedMessage.sources, hasLength(1));
     expect(groundedMessage.sources.single.id, 'error-e123');
     expect(find.text('Sources · 1'), findsOneWidget);
-    expect(find.text('E123 — Device cannot connect to network'), findsOneWidget);
+    expect(
+      find.text('E123 — Device cannot connect to network'),
+      findsOneWidget,
+    );
     expect(find.text('Boiler installation instructions'), findsNothing);
     expect(find.text('Annual maintenance schedule'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -2491,6 +2494,7 @@ class _FakeRagRepository implements RagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0,
   }) async {
@@ -2508,6 +2512,7 @@ class _RetryableRagRepository extends _FakeRagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0,
   }) async {
@@ -2516,7 +2521,12 @@ class _RetryableRagRepository extends _FakeRagRepository {
       throw StateError('EmbeddingGemma search failed');
     }
     await secondSearch;
-    return super.search(query: query, topK: topK, threshold: threshold);
+    return super.search(
+      query: query,
+      exactMatchQuery: exactMatchQuery,
+      topK: topK,
+      threshold: threshold,
+    );
   }
 }
 

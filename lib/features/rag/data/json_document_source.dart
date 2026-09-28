@@ -77,6 +77,7 @@ class JsonDocumentSource implements DocumentSource {
       id: _requiredString(record, 'id', index),
       title: _requiredString(record, 'title', index),
       content: _requiredString(record, 'content', index),
+      measures: _optionalString(record, 'measures', index),
       metadata: _requiredMetadata(record, index),
     );
   }
@@ -86,6 +87,24 @@ class JsonDocumentSource implements DocumentSource {
     if (value is! String || value.trim().isEmpty) {
       throw FormatException(
         'Document at index $index must contain a non-empty "$field" string.',
+      );
+    }
+    return value;
+  }
+
+  String? _optionalString(
+    Map<String, dynamic> record,
+    String field,
+    int index,
+  ) {
+    final value = record[field];
+    if (value == null) {
+      return null;
+    }
+    if (value is! String || value.trim().isEmpty) {
+      throw FormatException(
+        'Document at index $index must contain a non-empty "$field" string '
+        'when provided.',
       );
     }
     return value;

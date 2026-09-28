@@ -186,7 +186,10 @@ class AskQuestionUseCase {
         );
     profile?.mark(AiProfileEvent.retrievalQueryEnd);
     profile?.mark(AiProfileEvent.searchStart);
-    final searchResults = await _retrieveKnowledge(retrievalQuery);
+    final searchResults = await _retrieveKnowledge(
+      retrievalQuery,
+      exactMatchQuery: question,
+    );
     profile?.mark(AiProfileEvent.searchEnd);
     if (searchResults == null) {
       _debugLog('RETRIEVED:\nsearch failed');
@@ -203,6 +206,7 @@ class AskQuestionUseCase {
     profile?.mark(AiProfileEvent.groundingStart);
     final documents = _relevance.relevantDocuments(
       question: retrievalQuery,
+      identifierQuestion: question,
       results: searchResults,
     );
     profile?.mark(AiProfileEvent.groundingEnd);
@@ -297,10 +301,17 @@ class AskQuestionUseCase {
     }
   }
 
-  Future<List<RagSearchResult>?> _retrieveKnowledge(String question) async {
+  Future<List<RagSearchResult>?> _retrieveKnowledge(
+    String question, {
+    required String exactMatchQuery,
+  }) async {
     try {
       _debugLog('retrievalQueryCharacters=${question.length}');
-      return await _ragRepository.search(query: question, topK: 3);
+      return await _ragRepository.search(
+        query: question,
+        exactMatchQuery: exactMatchQuery,
+        topK: 3,
+      );
     } catch (_) {
       return null;
     }

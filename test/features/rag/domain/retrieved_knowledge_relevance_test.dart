@@ -47,6 +47,31 @@ void main() {
     }
   });
 
+  test('grounds normalized exact technical identifiers', () {
+    const document = KnowledgeDocument(
+      id: 'F.838',
+      title: 'Inverter control fault',
+      content: 'Control of inverter faulty.',
+      metadata: {'type': 'error', 'code': 'F838'},
+    );
+    final results = [
+      const RagSearchResult(document: document, similarity: 1.0),
+    ];
+
+    for (final question in [
+      'What is F.838?',
+      'What is F838?',
+      'what is f838?',
+    ]) {
+      expect(
+        relevance
+            .relevantDocuments(question: question, results: results)
+            .map((result) => result.id),
+        ['F.838'],
+      );
+    }
+  });
+
   test('rejects nearest documents without lexical grounding evidence', () {
     for (final question in [
       'What is the capital of France?',

@@ -4,6 +4,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import '../domain/knowledge_document.dart';
+import '../domain/knowledge_identifier_normalizer.dart';
 import '../domain/rag_document.dart';
 import '../domain/rag_repository.dart';
 import '../domain/rag_search_result.dart';
@@ -16,13 +17,18 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     required Future<String> Function() databasePathProvider,
     Future<void> Function()? prepareEmbeddingModel,
     FlutterGemmaRagRuntime? runtime,
+    KnowledgeIdentifierNormalizer identifierNormalizer =
+        const KnowledgeIdentifierNormalizer(),
   }) : _databasePathProvider = databasePathProvider,
        _prepareEmbeddingModel = prepareEmbeddingModel,
-       _runtime = runtime ?? FlutterGemmaRagRuntime();
+       _runtime = runtime ?? FlutterGemmaRagRuntime(),
+       _identifierNormalizer = identifierNormalizer;
 
   final Future<String> Function() _databasePathProvider;
   final Future<void> Function()? _prepareEmbeddingModel;
   final FlutterGemmaRagRuntime _runtime;
+  final KnowledgeIdentifierNormalizer _identifierNormalizer;
+  final _documentsByIdentifier = <String, Map<String, KnowledgeDocument>>{};
   Future<void>? _initialization;
 
   @override
@@ -40,6 +46,7 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     await initialize();
     await _prepareEmbeddingModel?.call();
     for (final document in documents) {
+      _indexIdentifiers(document.document);
       await _runtime.addDocument(
         id: document.document.id,
         content: document.searchableText,
@@ -47,6 +54,8 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
           _documentMetadataKey: {
             'title': document.document.title,
             'content': document.document.content,
+            if (document.document.measures != null)
+              'measures': document.document.measures,
             'metadata': document.document.metadata,
           },
         }),
@@ -57,6 +66,7 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0.0,
   }) async {
@@ -76,17 +86,49 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     }
     profile?.mark(AiProfileEvent.metadataDecodeStart);
     try {
-      return results
-          .map(
-            (result) => RagSearchResult(
-              document: _documentFromResult(result),
-              similarity: result.similarity,
-            ),
-          )
-          .toList(growable: false);
+      final exactResults = _exactResults(exactMatchQuery);
+      final resultIds = exactResults
+          .map((result) => result.document.id)
+          .toSet();
+      final combinedResults = <RagSearchResult>[...exactResults];
+      for (final result in results) {
+        final searchResult = RagSearchResult(
+          document: _documentFromResult(result),
+          similarity: result.similarity,
+        );
+        if (resultIds.add(searchResult.document.id)) {
+          combinedResults.add(searchResult);
+        }
+      }
+      return combinedResults;
     } finally {
       profile?.mark(AiProfileEvent.metadataDecodeEnd);
     }
+  }
+
+  void _indexIdentifiers(KnowledgeDocument document) {
+    final identifiers = {
+      ..._identifierNormalizer.extract(document.id),
+      if (document.metadata['code'] case final String code)
+        ..._identifierNormalizer.extract(code),
+    };
+    for (final identifier in identifiers) {
+      (_documentsByIdentifier[identifier] ??= {})[document.id] = document;
+    }
+  }
+
+  List<RagSearchResult> _exactResults(String? query) {
+    if (query == null) return const [];
+    final documentsById = <String, KnowledgeDocument>{};
+    for (final identifier in _identifierNormalizer.extract(query)) {
+      documentsById.addAll(
+        _documentsByIdentifier[identifier] ??
+            const <String, KnowledgeDocument>{},
+      );
+    }
+    return documentsById.values
+        .map((document) => RagSearchResult(document: document, similarity: 1.0))
+        .toList(growable: false);
   }
 
   KnowledgeDocument _documentFromResult(FlutterGemmaRagRuntimeResult result) {
@@ -98,12 +140,14 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
       final document = Map<String, dynamic>.from(storedDocument);
       final title = document['title'];
       final content = document['content'];
+      final measures = document['measures'];
       final metadata = document['metadata'];
       if (title is String && content is String && metadata is Map) {
         return KnowledgeDocument(
           id: result.id,
           title: title,
           content: content,
+          measures: measures is String ? measures : null,
           metadata: Map<String, dynamic>.from(metadata),
         );
       }

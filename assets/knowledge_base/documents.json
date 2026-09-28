@@ -2,31 +2,1355 @@
   "version": 1,
   "documents": [
     {
-      "id": "error-e123",
-      "title": "Device cannot connect to network",
-      "content": "The device is unable to establish a network connection.\n\nPossible causes:\n- Wi-Fi is unavailable\n- Network credentials are incorrect\n- The device is outside the network range\n\nResolution:\n- Check that Wi-Fi is enabled\n- Verify the network credentials\n- Move the device closer to the network\n- Retry the connection\n\nRelated documents:\n- E-123",
+      "id": "F.1",
+      "title": "The heat pump is switched off.",
+      "content": "Lead break, flow temperature sensor, secondary circuit / heating/cooling circuit 1",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X4.1/X4.2 of the EHCU electronics module. Replace sensor if required.",
       "metadata": {
         "type": "error",
-        "code": "E123"
+        "code": "F1"
       }
     },
     {
-      "id": "error-e456",
-      "title": "Authentication failed",
-      "content": "The device could not authenticate with the configured service.\n\nPossible causes:\n- Invalid credentials\n- Expired authentication session\n\nResolution:\n- Verify the credentials\n- Sign in again\n- Retry the operation\n\nRelated documents:\n- E456",
+      "id": "F.2",
+      "title": "The heat pump is switched off.",
+      "content": "Short circuit, flow temperature sensor, secondary circuit / heating/cooling circuit 1",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X4.1/X4.2 of the EHCU electronics module. Replace sensor if required.",
       "metadata": {
         "type": "error",
-        "code": "E456"
+        "code": "F2"
       }
     },
     {
-      "id": "error-e789",
-      "title": "Device communication timeout",
-      "content": "The device did not respond within the expected time.\n\nPossible causes:\n- Device is offline\n- Network latency\n- Temporary communication failure\n\nResolution:\n- Check device connectivity\n- Retry the operation\n- Restart the device if necessary\n\nRelated documents:\n- E789",
+      "id": "F.3",
+      "title": "- No defrost\n- No room cooling",
+      "content": "Lead break, secondary circuit return temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X4.3/X4.4 of the EHCU electronics module. Replace sensor if required.",
       "metadata": {
         "type": "error",
-        "code": "E789"
+        "code": "F3"
+      }
+    },
+    {
+      "id": "F.4",
+      "title": "- No defrost\n- No room cooling",
+      "content": "Short circuit, secondary circuit return temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X4.3/X4.4 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F4"
+      }
+    },
+    {
+      "id": "F.7",
+      "title": "- Only room heating\n- No DHW heating",
+      "content": "Lead break, cylinder temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ). Replace sensor if required.\n- Wall mounted indoor unit: Connection on the underside of the appliance to 6-pole connection socket on the right, terminals 9 and 10.\n- Floorstanding indoor unit: Connection at plug 5 on the HPMU electronics module",
+      "metadata": {
+        "type": "error",
+        "code": "F7"
+      }
+    },
+    {
+      "id": "F.8",
+      "title": "- Only room heating\n- No DHW heating",
+      "content": "Short circuit, cylinder temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ). Replace sensor if required.\n- Wall mounted indoor unit: Connection on the underside of the appliance to 6-pole connection socket on the right, terminals 9 and 10.\n- Floorstanding indoor unit: Connection at plug 5 on the HPMU electronics module",
+      "metadata": {
+        "type": "error",
+        "code": "F8"
+      }
+    },
+    {
+      "id": "F.13",
+      "title": "An outside temperature value of 0 °C is used to calculate the set flow temperature.",
+      "content": "Lead break, outside temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ). Replace sensor if required.\n- Wall mounted indoor unit: Connection on the underside of the appliance to 6-pole connection socket on the right, terminals 11 and 12.\n- Floorstanding indoor unit: Connection at luster terminals for sensors, terminal 5 and 6",
+      "metadata": {
+        "type": "error",
+        "code": "F13"
+      }
+    },
+    {
+      "id": "F.14",
+      "title": "An outside temperature value of 0 °C is used to calculate the set flow temperature.",
+      "content": "Short circuit, outside temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ). Replace sensor if required.\n- Wall mounted indoor unit: Connection on the underside of the appliance to 6-pole connection socket on the right, terminals 11 and 12.\n- Floorstanding indoor unit: Connection at luster terminals for sensors, terminal 5 and 6",
+      "metadata": {
+        "type": "error",
+        "code": "F14"
+      }
+    },
+    {
+      "id": "F.33",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, air inlet temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X16.3/X16.4 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F33"
+      }
+    },
+    {
+      "id": "F.34",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, air inlet temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X16.3/X16.4 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F34"
+      }
+    },
+    {
+      "id": "F.74",
+      "title": "The heat pump is switched off.",
+      "content": "Hydraulic system pressure too low",
+      "measures": "Top up with water. Vent the system. If the fault occurs repeatedly:\n- Check system pressure sensor with external pressure gauge.\n- Check the pre-charge pressure of the expansion vessel.\n- Check settings for set system pressure and range.",
+      "metadata": {
+        "type": "error",
+        "code": "F74"
+      }
+    },
+    {
+      "id": "F.75",
+      "title": "The heat pump is switched off.",
+      "content": "No flow in the secondary circuit, or flow sensor faulty",
+      "measures": "- Check secondary pump//heating circuit pump, heating/cooling circuit 1. Replace secondary pump//heating circuit pump, heating/cooling circuit 1 if required.\n- Check flow sensor. Replace flow sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F75"
+      }
+    },
+    {
+      "id": "F.87",
+      "title": "The safety valve in the indoor unit has opened.",
+      "content": "Hydraulic system pressure too high",
+      "measures": "Reduce the system pressure.",
+      "metadata": {
+        "type": "error",
+        "code": "F87"
+      }
+    },
+    {
+      "id": "F.91",
+      "title": "Function of connected components in emergency mode",
+      "content": "DIO electronics module communication error",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check connections to DIO electronics module and connection to HPMU electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace DIO electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F91"
+      }
+    },
+    {
+      "id": "F.92",
+      "title": "Function of connected components in emergency mode",
+      "content": "ADIO electronics module communication error",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check connections on ADIO electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace ADIO electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F92"
+      }
+    },
+    {
+      "id": "F.93",
+      "title": "Function of connected components in emergency mode",
+      "content": "M2IO electronics module communication error",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check connections on M2IO electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace M2IO electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F93"
+      }
+    },
+    {
+      "id": "F.94",
+      "title": "Function of the relevant electronics module in emergency mode",
+      "content": "SDIO electronics module communication error",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check connections on SDIO electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace SDIO electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F94"
+      }
+    },
+    {
+      "id": "F.99",
+      "title": "Function of the electronics modules connected to Plus-Bus not available",
+      "content": "Communication error PlusBus",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check connections at plug 74 of the HPMU electronics module.\n- Wall mounted indoor unit: Check the connections at plug 74 on the connection socket on the underside of the appliance.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace HPMU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F99"
+      }
+    },
+    {
+      "id": "F.100",
+      "title": "Function of the electronics modules connected to Plus-Bus not available",
+      "content": "Short circuit, PlusBus",
+      "measures": "- Check PlusBus power supply at HPMU electronics module: Isolate all PlusBus components connected. Reconnect each one in turn.\n- Check connections at plug 74 of the HPMU electronics module.\n- Wall mounted indoor unit: Check the connections at plug 74 on the connection socket on the underside of the appliance.\n- Check whether there is a short circuit at the PlusBus cables.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace HPMU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F100"
+      }
+    },
+    {
+      "id": "F.101",
+      "title": "Function of the electronics modules connected to Plus-Bus not available",
+      "content": "Voltage error PlusBus",
+      "measures": "- Check PlusBus power supply at HPMU electronics module: Isolate all PlusBus components connected. Reconnect each one in turn.\n- Check connections at plug 74 of the HPMU electronics module.\n- Wall mounted indoor unit: Check the connections at plug 74 on the connection socket on the underside of the appliance.\n- Check whether there is a short circuit at the PlusBus cables.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace HPMU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F101"
+      }
+    },
+    {
+      "id": "F.102",
+      "title": "No WiFi",
+      "content": "Communication error, Wi-Fi communication module",
+      "measures": "Replace the WiFi communication module.",
+      "metadata": {
+        "type": "error",
+        "code": "F102"
+      }
+    },
+    {
+      "id": "F.103",
+      "title": "No operation possible",
+      "content": "HMI programming unit communication error",
+      "measures": "Replace HMI programming unit.",
+      "metadata": {
+        "type": "error",
+        "code": "F103"
+      }
+    },
+    {
+      "id": "F.104",
+      "title": "Depending on configuration of EM-EA1 extension (DIO electronics module)",
+      "content": "External fault message input active",
+      "measures": "- Check the settings in the commissioning assistant for fault message input. Adjust settings if required.\n- Check connected external appliance.",
+      "metadata": {
+        "type": "error",
+        "code": "F104"
+      }
+    },
+    {
+      "id": "F.111",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, liquid gas temperature sensor, heating",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X21.1/X21.2 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F111"
+      }
+    },
+    {
+      "id": "F.112",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, liquid gas temperature sensor, heating",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X21.1/X21.2 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F112"
+      }
+    },
+    {
+      "id": "F.117",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, evaporator suction gas temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X20.5/X20.6 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F117"
+      }
+    },
+    {
+      "id": "F.118",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, evaporator suction gas temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X20.5/X20.6 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F118"
+      }
+    },
+    {
+      "id": "F.123",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, liquid gas temperature sensor, condenser",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X15.1/X15.2 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F123"
+      }
+    },
+    {
+      "id": "F.124",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, liquid gas temperature sensor, condenser",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X15.1/X15.2 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F124"
+      }
+    },
+    {
+      "id": "F.147",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, compressor suction gas temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X14.7/X14.8 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F147"
+      }
+    },
+    {
+      "id": "F.148",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, compressor suction gas temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X14.7/X14.8 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F148"
+      }
+    },
+    {
+      "id": "F.149",
+      "title": "The refrigerant circuit is controlled with the replacement value.",
+      "content": "Lead break, liquid gas temperature sensor, cooling",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X16.1/X16.2 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F149"
+      }
+    },
+    {
+      "id": "F.150",
+      "title": "The refrigerant circuit is controlled with the replacement value.",
+      "content": "Short circuit, liquid gas temperature sensor, cooling",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X16.1/X16.2 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F150"
+      }
+    },
+    {
+      "id": "F.151",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, hot gas temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X14.9/X14.10 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F151"
+      }
+    },
+    {
+      "id": "F.152",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, hot gas temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X14.9/X14.10 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F152"
+      }
+    },
+    {
+      "id": "F.155",
+      "title": "The refrigerant circuit is locked.",
+      "content": "Fault, electronic expansion valve 1",
+      "measures": "Check electronic expansion valve 1. Replace expansion valve if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F155"
+      }
+    },
+    {
+      "id": "F.156",
+      "title": "The refrigerant circuit is locked.",
+      "content": "Fault, electronic expansion valve 2",
+      "measures": "Check electronic expansion valve 2. Replace expansion valve if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F156"
+      }
+    },
+    {
+      "id": "F.160",
+      "title": "No communication between the affected electronics modules",
+      "content": "CAN bus general communication fault between the affected electronics modules",
+      "measures": "- Check the CAN bus cable.\n- Check the CAN bus subscriber numbers.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the CAN bus cables. Replace the electronics modules if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F160"
+      }
+    },
+    {
+      "id": "F.425",
+      "title": "Values in energy cockpit incorrect",
+      "content": "Time synchronisation not possible",
+      "measures": "- Replace CR2032 battery in HPMU electronics module.\n- Set the time on the programming unit: See operating instructions.",
+      "metadata": {
+        "type": "error",
+        "code": "F425"
+      }
+    },
+    {
+      "id": "F.430",
+      "title": "Operation with internal set value specifications of the heat pump control unit",
+      "content": "Communication error, gateway",
+      "measures": "- Check connections and connecting cable to the gateway. Replace cable if required.\n- Check power supply to the gateway.",
+      "metadata": {
+        "type": "error",
+        "code": "F430"
+      }
+    },
+    {
+      "id": "F.431",
+      "title": "Operation with internal set value specifications of the heat pump control unit",
+      "content": "KNX/TP gateway communication error",
+      "measures": "- Check connections and connecting cable to the gateway. Replace cable if required.\n- Check power supply to KNX/TP gateway.",
+      "metadata": {
+        "type": "error",
+        "code": "F431"
+      }
+    },
+    {
+      "id": "F.454",
+      "title": "The refrigerant circuit is locked.",
+      "content": "Incorrect version of operating software for the electronics modules",
+      "measures": "- Check the version of the operating software for HPMU and EH-CU electronics modules and for the VCMU refrigerant circuit controller.\n- Install correct software version if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F454"
+      }
+    },
+    {
+      "id": "F.472",
+      "title": "No communication with energy meter",
+      "content": "Communication error, energy meter",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check the connections to the HPMU electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace HPMU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F472"
+      }
+    },
+    {
+      "id": "F.519",
+      "title": "Operation with internal set value specifications of the heat pump control unit",
+      "content": "BACnet/IP gateway communication error",
+      "measures": "- Check connections and connecting cable to the gateway. Replace cable if required.\n- Check power supply to BACnet/IP gateway.",
+      "metadata": {
+        "type": "error",
+        "code": "F519"
+      }
+    },
+    {
+      "id": "F.520",
+      "title": "Refrigerant circuit off",
+      "content": "Communication error, Modbus",
+      "measures": "- Check the Modbus cable between inverter and refrigerant circuit controller VCMU at connection X11/X13 on refrigerant circuit controller VCMU.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the VCMU refrigerant circuit controller and/or the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F520"
+      }
+    },
+    {
+      "id": "F.542",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Lead break, flow temperature sensor, heating/cooling circuit 1 with mixer Or Wrong setting during commissioning",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch S1 on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 1.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F542"
+      }
+    },
+    {
+      "id": "F.543",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Short circuit, flow temperature sensor, heating/cooling circuit 1 with mixer",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch S1 on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 1.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F543"
+      }
+    },
+    {
+      "id": "F.544",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Lead break, flow temperature sensor, heating/cooling circuit 2 with mixer Or Wrong setting during commissioning",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch S1 on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 2.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F544"
+      }
+    },
+    {
+      "id": "F.545",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Short circuit, flow temperature sensor, heating/cooling circuit 2 with mixer",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch S1 on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 2.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F545"
+      }
+    },
+    {
+      "id": "F.546",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Lead break, flow temperature sensor, heating/cooling circuit 3 with mixer Or Wrong setting during commissioning",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 3.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F546"
+      }
+    },
+    {
+      "id": "F.547",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Short circuit, flow temperature sensor, heating/cooling circuit 3 with mixer",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 3.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F547"
+      }
+    },
+    {
+      "id": "F.548",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Lead break, flow temperature sensor, heating/cooling circuit 4 with mixer Or Wrong setting during commissioning",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 4.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F548"
+      }
+    },
+    {
+      "id": "F.549",
+      "title": "Mixer closes. Heating circuit pump is operational.",
+      "content": "Short circuit, flow temperature sensor, heating/cooling circuit 4 with mixer",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check setting of rotary switch on ADIO electronics module.\n- Check flow temperature sensor in heating/cooling circuit 4.\n- Check resistance value (NTC 10 kΩ) at the sensor input on ADIO electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F549"
+      }
+    },
+    {
+      "id": "F.623",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Lead break, return temperature sensor",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F623"
+      }
+    },
+    {
+      "id": "F.624",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Short circuit, return temperature sensor",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F624"
+      }
+    },
+    {
+      "id": "F.625",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Lead break, return temperature sensor, heating/ cooling circuit 2",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F625"
+      }
+    },
+    {
+      "id": "F.626",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Short circuit, return temperature sensor, heating/ cooling circuit 2",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F626"
+      }
+    },
+    {
+      "id": "F.627",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Lead break, return temperature sensor, heating/ cooling circuit 3",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F627"
+      }
+    },
+    {
+      "id": "F.628",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Short circuit, return temperature sensor, heating/ cooling circuit 3",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F628"
+      }
+    },
+    {
+      "id": "F.629",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Lead break, return temperature sensor, heating/ cooling circuit 4",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F629"
+      }
+    },
+    {
+      "id": "F.630",
+      "title": "Mixer closes. Heating circuit pump switches off.",
+      "content": "Short circuit, return temperature sensor, heating/ cooling circuit 4",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at mixer extension kit. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F630"
+      }
+    },
+    {
+      "id": "F.685",
+      "title": "- Function of connected components in emergency mode\n- Frost protection enabled",
+      "content": "HPMU electronics module communication error",
+      "measures": "- Check the connections to the HPMU electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace HPMU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F685"
+      }
+    },
+    {
+      "id": "F.686",
+      "title": "The refrigerant circuit will not start.",
+      "content": "VCMU refrigerant circuit controller communication error",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check connections on VCMU refrigerant circuit controller.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the VCMU refrigerant circuit controller.",
+      "metadata": {
+        "type": "error",
+        "code": "F686"
+      }
+    },
+    {
+      "id": "F.687",
+      "title": "- The heat pump is switched off.\n- No function of connected components",
+      "content": "EHCU electronics module communication error",
+      "measures": "- Check connections on EH-CU electronics module.\n- Check whether components are wrongly connected.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the EHCU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F687"
+      }
+    },
+    {
+      "id": "F.770",
+      "title": "Refrigerant circuit off",
+      "content": "Lead break, flow temperature sensor, secondary circuit downstream of condenser",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X15.3/X15.4 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F770"
+      }
+    },
+    {
+      "id": "F.771",
+      "title": "Refrigerant circuit off",
+      "content": "Short circuit, flow temperature sensor, secondary circuit downstream of condenser",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X15.3/X15.4 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F771"
+      }
+    },
+    {
+      "id": "F.772",
+      "title": "Refrigerant circuit can only be operated when outside temperatures are above 5 °C",
+      "content": "Lead break, oil sump temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X20.3/X20.4 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F772"
+      }
+    },
+    {
+      "id": "F.773",
+      "title": "Refrigerant circuit can only be operated when outside temperatures are above 5 °C",
+      "content": "Short circuit, oil sump temperature sensor",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection X20.3/X20.4 of the VCMU refrigerant circuit controller. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F773"
+      }
+    },
+    {
+      "id": "F.788",
+      "title": "- No room heating/cooling\n- No DHW heating",
+      "content": "Fault, control and/or power supply of 4/3-way valve",
+      "measures": "- Check connections on motor of 4/3-way valve.\n- Check motor of 4/3-way valve.\n- Replace motor if necessary.",
+      "metadata": {
+        "type": "error",
+        "code": "F788"
+      }
+    },
+    {
+      "id": "F.790",
+      "title": "- No room heating/cooling\n- No DHW heating",
+      "content": "- Motor of 4/3-way valve not correctly mounted\n- 4/3-way valve faulty",
+      "measures": "- Check mounting of motor: See separate installation instructions.\n- Check hydraulic and electrical connections of 4/3-way valve.\n- Check motor of 4/3-way valve.\n- Replace motor and/or 4/3-way valve if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F790"
+      }
+    },
+    {
+      "id": "F.791",
+      "title": "Reduced output, instantaneous heating water heater",
+      "content": "Phase L1 in power supply of instantaneous heating water heater not present",
+      "measures": "- Check fuse for instantaneous heating water heater.\n- Check power supply on instantaneous heating water heater and on connections of indoor unit.\n- Check power cables.\n- Check instantaneous heating water heater. Replace if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F791"
+      }
+    },
+    {
+      "id": "F.792",
+      "title": "Reduced output, instantaneous heating water heater",
+      "content": "Phase L2 in power supply of instantaneous heating water heater not present",
+      "measures": "- Check fuse for instantaneous heating water heater.\n- Check power supply on instantaneous heating water heater and on connections of indoor unit.\n- Check power cables.\n- Check instantaneous heating water heater. Replace if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F792"
+      }
+    },
+    {
+      "id": "F.793",
+      "title": "Reduced output, instantaneous heating water heater",
+      "content": "Phase L3 in power supply of instantaneous heating water heater not present",
+      "measures": "- Check fuse for instantaneous heating water heater.\n- Check power supply on instantaneous heating water heater and on connections of indoor unit.\n- Check power cables.\n- Check instantaneous heating water heater. Replace if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F793"
+      }
+    },
+    {
+      "id": "F.797",
+      "title": "Secondary pump/heating circuit pump, heating/cooling circuit 1 is off.\n- No room heating, heating/ cooling circuit 1\n- No DHW heating",
+      "content": "Secondary pump/heating circuit pump, heating/cooling circuit 1 is faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace secondary pump/heating circuit pump, heating/cooling circuit 1.",
+      "metadata": {
+        "type": "error",
+        "code": "F797"
+      }
+    },
+    {
+      "id": "F.798",
+      "title": "Heating circuit pump, heating/cooling circuit 2 is off.\n- No room heating, heating/ cooling circuit 2\n- No DHW heating",
+      "content": "Heating circuit pump, heating/cooling circuit 2 is faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace heating circuit pump, heating/cooling circuit 2.",
+      "metadata": {
+        "type": "error",
+        "code": "F798"
+      }
+    },
+    {
+      "id": "F.799",
+      "title": "Secondary pump/heating circuit pump, heating/cooling circuit 1 is off.\n- No room heating, heating/ cooling circuit 1\n- No DHW heating",
+      "content": "Secondary pump/heating circuit pump, heating/cooling circuit 1 is faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace secondary pump/heating circuit pump, heating/cooling circuit 1.",
+      "metadata": {
+        "type": "error",
+        "code": "F799"
+      }
+    },
+    {
+      "id": "F.800",
+      "title": "Heating circuit pump, heating/cooling circuit 2 is off.\n- No room heating, heating/ cooling circuit 2\n- No DHW heating",
+      "content": "Heating circuit pump, heating/cooling circuit 2 is faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace heating circuit pump, heating/cooling circuit 2.",
+      "metadata": {
+        "type": "error",
+        "code": "F800"
+      }
+    },
+    {
+      "id": "F.801",
+      "title": "Fault, outdoor unit, no refrigerant circuit reversal",
+      "content": "4-way diverter valve faulty",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check 4-way diverter valve (function check). Replace coil if required.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the 4way diverter valve.",
+      "metadata": {
+        "type": "error",
+        "code": "F801"
+      }
+    },
+    {
+      "id": "F.808",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Lower fan not running.",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check fan can rotate freely.\n- Check lower fan via actuator test.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the lower fan.",
+      "metadata": {
+        "type": "error",
+        "code": "F808"
+      }
+    },
+    {
+      "id": "F.812",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Upper fan not running.",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check fan can rotate freely.\n- Check upper fan via actuator test.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the upper fan.",
+      "metadata": {
+        "type": "error",
+        "code": "F812"
+      }
+    },
+    {
+      "id": "F.819",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Lead break, electronic expansion valve 1",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check electronic expansion valve 1 via actuator test.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace electronic expansion valve 1.",
+      "metadata": {
+        "type": "error",
+        "code": "F819"
+      }
+    },
+    {
+      "id": "F.820",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Lead break, electronic expansion valve 2",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check electronic expansion valve 2 via actuator test.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace electronic expansion valve 2.",
+      "metadata": {
+        "type": "error",
+        "code": "F820"
+      }
+    },
+    {
+      "id": "F.823",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Short circuit, electronic expansion valve 1",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check electronic expansion valve 1 via actuator test.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace electronic expansion valve 1.",
+      "metadata": {
+        "type": "error",
+        "code": "F823"
+      }
+    },
+    {
+      "id": "F.824",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Short circuit, electronic expansion valve 2",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Check electronic expansion valve 2 via actuator test.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace electronic expansion valve 2.",
+      "metadata": {
+        "type": "error",
+        "code": "F824"
+      }
+    },
+    {
+      "id": "F.827",
+      "title": "The instantaneous heating water heater will not start.",
+      "content": "High limit safety cut-out has responded.",
+      "measures": "- Reset the high limit safety cutout.\n- Check instantaneous heating water heater. Replace if required.\n- Safeguard the minimum flow rate. Check flow sensor. Replace if required.\n- Safeguard the minimum flow rate. Check secondary pump / heating circuit pumps. Replace if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F827"
+      }
+    },
+    {
+      "id": "F.829",
+      "title": "Flow rate too low, insufficient heat provision",
+      "content": "Filter in ball valve of outdoor unit is contaminated",
+      "measures": "Clean the filter in the outdoor unit ball valve.",
+      "metadata": {
+        "type": "error",
+        "code": "F829"
+      }
+    },
+    {
+      "id": "F.830",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Power supply on inverter faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F830"
+      }
+    },
+    {
+      "id": "F.831",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Power supply on inverter faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F831"
+      }
+    },
+    {
+      "id": "F.832",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Inverter temperature sensor faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F832"
+      }
+    },
+    {
+      "id": "F.833",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Inverter temperature sensor faulty",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F833"
+      }
+    },
+    {
+      "id": "F.834",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Power supply on inverter faulty",
+      "measures": "Check the power supply of the outdoor unit (compressor power supply). If the fault persists, contact the power supply utility.",
+      "metadata": {
+        "type": "error",
+        "code": "F834"
+      }
+    },
+    {
+      "id": "F.835",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Unsuitable inverter or inverter incorrectly programmed",
+      "measures": "Consult Viessmann Technical Service.",
+      "metadata": {
+        "type": "error",
+        "code": "F835"
+      }
+    },
+    {
+      "id": "F.836",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Overvoltage fault on inverter",
+      "measures": "- Check power connection on compressor.\n- If the fault persists, replace the inverter.\n- If the fault persists, replace the compressor.",
+      "metadata": {
+        "type": "error",
+        "code": "F836"
+      }
+    },
+    {
+      "id": "F.837",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Power supply on compressor faulty",
+      "measures": "- Check the electrical connection between inverter and compressor.\n- If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F837"
+      }
+    },
+    {
+      "id": "F.838",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Control of inverter faulty",
+      "measures": "- Issue new demand to compressor.\n- If the fault occurs frequently, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F838"
+      }
+    },
+    {
+      "id": "F.839",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Compressor blocked",
+      "measures": "- Issue new demand to compressor.\n- If the fault occurs frequently, replace the compressor.",
+      "metadata": {
+        "type": "error",
+        "code": "F839"
+      }
+    },
+    {
+      "id": "F.841",
+      "title": "Compressor running unevenly.",
+      "content": "- Excessive compressor torque\n- Compressor power consumption high",
+      "measures": "- Issue new demand to compressor.\n- If the fault occurs frequently, replace the compressor.\n- Issue new demand to compressor.\n- If the fault persists, replace the compressor.",
+      "metadata": {
+        "type": "error",
+        "code": "F841"
+      }
+    },
+    {
+      "id": "F.843",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Overvoltage shutdown, inverter",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F843"
+      }
+    },
+    {
+      "id": "F.845",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Unsuitable inverter or inverter incorrectly programmed",
+      "measures": "Refer to type plate and order No. to check whether correct part was delivered and installed. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F845"
+      }
+    },
+    {
+      "id": "F.846",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Compressor rotating field counter-rotating",
+      "measures": "- Check phase connections on inverter.\n- Check compressor power supply.",
+      "metadata": {
+        "type": "error",
+        "code": "F846"
+      }
+    },
+    {
+      "id": "F.847",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Voltage error on inverter",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F847"
+      }
+    },
+    {
+      "id": "F.848",
+      "title": "Refrigerant circuit off: Inverter and compressor cannot be switched on.",
+      "content": "Voltage error on inverter",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F848"
+      }
+    },
+    {
+      "id": "F.864",
+      "title": "- No defrost\n- Compressor cannot be switched on.",
+      "content": "Outdoor unit defrost attempt unsuccessful",
+      "measures": "Check outdoor unit for icing up. De-ice if necessary.",
+      "metadata": {
+        "type": "error",
+        "code": "F864"
+      }
+    },
+    {
+      "id": "F.865",
+      "title": "Refrigerant circuit off",
+      "content": "High pressure fault:\n- Air in the secondary circuit\n- Secondary circuit/heating circuit shut off\n- Secondary pump or heating circuit pumps blocked or faulty\n- Condenser contaminated\n- High pressure sensor faulty\n- Set flow temperatures for central heating/DHW heating too high",
+      "measures": "- Vent the secondary circuit.\n- Check the system pressure.\n- Check secondary pump and heating circuit pumps.\n- Flush heating circuits.\n- Measure voltage at connection X14.1/X14.2 of the VCMU refrigerant circuit controller. Replace sensor if required.\n- Adjust set temperatures of consumers.\n- Check outdoor unit for icing up. De-ice if necessary.",
+      "metadata": {
+        "type": "error",
+        "code": "F865"
+      }
+    },
+    {
+      "id": "F.866",
+      "title": "Refrigerant circuit off",
+      "content": "Low pressure fault:\n- Too little refrigerant\n- Evaporator contaminated\n- Fans blocked or faulty",
+      "measures": "- Check amount of refrigerant. Top up refrigerant if required.\n- Clean the evaporator.\n- Check fans. Remove blockages. Replace fans if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F866"
+      }
+    },
+    {
+      "id": "F.867",
+      "title": "Heat pump off",
+      "content": "Float air vent valve in the outdoor unit has responded.\n- Too much air in the secondary circuit during venting\n- Quick-action air vent valve may be faulty Or\n- Refrigerant present in the float air vent valve",
+      "measures": "Specialist personnel working on a refrigerant circuit with flammable refrigerant are required to have specific qualifications and certification: See \"Safety information\". Danger Escaping refrigerant can lead to explosions that result in very serious injuries. Observe guidance on measures and steps to take in the event of escaping refrigerant: See \"Safety information\". If a message appears during venting:\n- Check the quick-action air vent valve. Replace quick-action air vent valve if required.\n- Restart filling programme. If a message appears during operation:\n- Isolate the system from the power supply.\n- Shut off the hydraulic connection between the indoor and outdoor unit.\n- Notify Viessmann Werke Technical Service.",
+      "metadata": {
+        "type": "error",
+        "code": "F867"
+      }
+    },
+    {
+      "id": "F.876",
+      "title": "The heat pump is switched off.",
+      "content": "Lead break, flow sensor",
+      "measures": "Check flow sensor. Replace flow sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F876"
+      }
+    },
+    {
+      "id": "F.881",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Refrigerant circuit safety shutdown",
+      "measures": "Isolate the system from the power supply. Restart the system. If the fault persists, replace the inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F881"
+      }
+    },
+    {
+      "id": "F.912",
+      "title": "Refrigerant circuit off",
+      "content": "Interior temperature sensor fault",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection P1.8/P1.9 on the inverter. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F912"
+      }
+    },
+    {
+      "id": "F.913",
+      "title": "Refrigerant circuit off",
+      "content": "Interior temperature too high",
+      "measures": "Reduce ambient temperature, for example through sun protection.",
+      "metadata": {
+        "type": "error",
+        "code": "F913"
+      }
+    },
+    {
+      "id": "F.983",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Internal inverter fault",
+      "measures": "Check inverter. Replace inverter if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F983"
+      }
+    },
+    {
+      "id": "F.984",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Control of electronic expansion valve 1 faulty",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the VCMU refrigerant circuit controller.",
+      "metadata": {
+        "type": "error",
+        "code": "F984"
+      }
+    },
+    {
+      "id": "F.985",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Control of electronic expansion valve 2 faulty",
+      "measures": "- Check connections on VCMU refrigerant circuit controller.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the VCMU refrigerant circuit controller.",
+      "metadata": {
+        "type": "error",
+        "code": "F985"
+      }
+    },
+    {
+      "id": "F.990",
+      "title": "Secondary circuit not controlled",
+      "content": "Short circuit, temperature sensor",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F990"
+      }
+    },
+    {
+      "id": "F.991",
+      "title": "Secondary circuit not controlled",
+      "content": "Lead break, temperature sensor",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F991"
+      }
+    },
+    {
+      "id": "F.992",
+      "title": "No heating/cooling of external heating water/coolant buffer cylinder",
+      "content": "Short circuit, temperature sensor of external heating water/coolant buffer cylinder",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F992"
+      }
+    },
+    {
+      "id": "F.993",
+      "title": "No heating of external heating water/coolant buffer cylinder",
+      "content": "Lead break, temperature sensor of external heating water/coolant buffer cylinder",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F993"
+      }
+    },
+    {
+      "id": "F.994",
+      "title": "No heating of external heating water buffer cylinder",
+      "content": "Short circuit, temperature sensor of external heating water buffer cylinder",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17.1/X17.2 of the EH-CU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F994"
+      }
+    },
+    {
+      "id": "F.995",
+      "title": "No heating of external heating water buffer cylinder",
+      "content": "Lead break, temperature sensor of external heating water buffer cylinder",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17.1/X17.2 of the EH-CU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F995"
+      }
+    },
+    {
+      "id": "F.996",
+      "title": "No cooling of external coolant buffer cylinder",
+      "content": "Short circuit, temperature sensor of external coolant buffer cylinder",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F996"
+      }
+    },
+    {
+      "id": "F.997",
+      "title": "No cooling of external coolant buffer cylinder",
+      "content": "Lead break, temperature sensor of external coolant buffer cylinder",
+      "measures": "- Check the settings in the commissioning assistant. Adjust settings if required.\n- Check resistance value (NTC 10 kΩ) at connection X17 of the EHCU electronics module. Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F997"
+      }
+    },
+    {
+      "id": "F.998",
+      "title": "The refrigerant circuit will not start.",
+      "content": "Flow rate signal faulty",
+      "measures": "- Check flow sensor. Replace if required.\n- Check CAN bus connections: – CAN bus cable, indoor/outdoor unit – Check connection X19 on EH-CU electronics module. – Check connections X4 on HPMU electronics module. – Check connection X5 on EH-CU electronics module.\n- Isolate the system from the power supply. Restart the system. If the fault persists, replace the CAN bus cable. Replace EH-CU electronics module if required. Replace HPMU electronics module if required. If the fault occurs repeatedly, replace VCMU refrigerant circuit controller, internal CAN bus cable harness and EHCU electronics module.",
+      "metadata": {
+        "type": "error",
+        "code": "F998"
+      }
+    },
+    {
+      "id": "F.1009",
+      "title": "Refrigerant circuit off",
+      "content": "Fault, oil sump heater",
+      "measures": "Check oil sump heater. Check electrical connections X4 on VCMU refrigerant circuit controller. Replace oil sump heater if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F1009"
+      }
+    },
+    {
+      "id": "F.1010",
+      "title": "Refrigerant circuit off",
+      "content": "Fault, secondary circuit pressure sensor",
+      "measures": "To check the sensor, measure the voltage at the sensor or at connection X11 of the EHCU electronics module (0 to 5 V). Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F1010"
+      }
+    },
+    {
+      "id": "F.1011",
+      "title": "Refrigerant circuit off",
+      "content": "Fault, high pressure sensor",
+      "measures": "To check the sensor, measure the voltage at the sensor or at connection X14.1 to X14.3 of the VCMU refrigerant circuit controller (0 to 5 V). Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F1011"
+      }
+    },
+    {
+      "id": "F.1012",
+      "title": "Refrigerant circuit off",
+      "content": "Fault, low pressure sensor",
+      "measures": "To check the sensor, measure the voltage at the sensor or at connection X14.4 to X14.6 of the VCMU refrigerant circuit controller (0 to 5 V). Replace sensor if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F1012"
+      }
+    },
+    {
+      "id": "F.1045",
+      "title": "External heat generator not ready for operation",
+      "content": "Fault on external heat generator",
+      "measures": "Check the fault message on the control unit of the external heat generator. Remedy the fault. Installation and service instructions for external heat generator and associated control unit",
+      "metadata": {
+        "type": "error",
+        "code": "F1045"
+      }
+    },
+    {
+      "id": "F.1049",
+      "title": "External heat generator not ready for operation",
+      "content": "3/2-way mixing valve not switching.",
+      "measures": "Check the 3/2-way mixing valve. Replace if required.",
+      "metadata": {
+        "type": "error",
+        "code": "F1049"
+      }
+    },
+    {
+      "id": "F.1050",
+      "title": "Uncontrolled operation of the external heat generator",
+      "content": "Short circuit, boiler water temperature sensor, external heat generator",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection TS2 of the HIO electronics module. Replace sensor if necessary.",
+      "metadata": {
+        "type": "error",
+        "code": "F1050"
+      }
+    },
+    {
+      "id": "F.1051",
+      "title": "Uncontrolled operation of the external heat generator",
+      "content": "Lead break, boiler water temperature sensor, external heat generator",
+      "measures": "Check resistance value (NTC 10 kΩ) at connection TS2 of the HIO electronics module. Replace sensor if necessary.",
+      "metadata": {
+        "type": "error",
+        "code": "F1051"
+      }
+    },
+    {
+      "id": "F.1054",
+      "title": "External heat generator not ready for operation",
+      "content": "Max. temperature of external heat generator exceeded",
+      "measures": "Check the cause of exceeding the max. temperature at the external heat generator. Remedy any fault. Installation and service instructions for external heat generator and associated control unit",
+      "metadata": {
+        "type": "error",
+        "code": "F1054"
+      }
+    },
+    {
+      "id": "F.1056",
+      "title": "Heat pump off",
+      "content": "Inverter relay faulty",
+      "measures": "Replace inverter.",
+      "metadata": {
+        "type": "error",
+        "code": "F1056"
+      }
+    },
+    {
+      "id": "A.2",
+      "title": "- Frost protection enabled\n- Heat demand, heat pump running.\n- DHW circulation pump enabled",
+      "content": "Outside temperature has undershot the specified frost protection limit.",
+      "measures": "No action required",
+      "metadata": {
+        "type": "error",
+        "code": "A2"
+      }
+    },
+    {
+      "id": "A.11",
+      "title": "Central heating/cooling only for some rooms",
+      "content": "System pressure too low",
+      "measures": "Top up with water.",
+      "metadata": {
+        "type": "error",
+        "code": "A11"
+      }
+    },
+    {
+      "id": "A.12",
+      "title": "Incorrect time",
+      "content": "Battery in HPMU electronics module flat.",
+      "measures": "- Replace CR2032 battery in HPMU electronics module.\n- Set the time on the programming unit: See operating instructions.",
+      "metadata": {
+        "type": "error",
+        "code": "A12"
       }
     }
   ]
+
 }

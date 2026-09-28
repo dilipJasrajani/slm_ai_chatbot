@@ -203,6 +203,42 @@ User: How can I fix it?''');
     },
   );
 
+  test('grounds identifiers only from the current user question', () async {
+    final history = InMemoryConversationHistory();
+    history.addAll(const [
+      ConversationMessage(
+        author: ConversationAuthor.user,
+        text: 'What does F838 mean?',
+      ),
+      ConversationMessage(
+        author: ConversationAuthor.assistant,
+        text: 'It relates to system servicing.',
+      ),
+    ]);
+    final ragRepository = _FakeRagRepository([
+      const RagSearchResult(
+        document: KnowledgeDocument(
+          id: 'F.838',
+          title: 'Inverter control fault',
+          content: 'Control of inverter faulty.',
+          metadata: {'type': 'error', 'code': 'F838'},
+        ),
+        similarity: 1.0,
+      ),
+    ]);
+    final useCase = AskQuestionUseCase(
+      ragRepository: ragRepository,
+      llmService: _FakeLlmService(() => Stream.value('Unsupported.')),
+      conversationHistory: history,
+    );
+
+    final result = await useCase('What is the capital of France?');
+
+    expect(ragRepository.query, contains('What does F838 mean?'));
+    expect(ragRepository.exactMatchQuery, 'What is the capital of France?');
+    expect(result.documents, isEmpty);
+  });
+
   test(
     'retrieves before conversational generation when no document is grounded',
     () async {
@@ -775,6 +811,7 @@ class _FakeRagRepository implements RagRepository {
 
   List<RagSearchResult> results;
   String? query;
+  String? exactMatchQuery;
   double? threshold;
   int? topK;
 
@@ -787,10 +824,12 @@ class _FakeRagRepository implements RagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0.0,
   }) async {
     this.query = query;
+    this.exactMatchQuery = exactMatchQuery;
     this.threshold = threshold;
     this.topK = topK;
     return results;
@@ -807,6 +846,7 @@ class _ThrowingRagRepository implements RagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0.0,
   }) {

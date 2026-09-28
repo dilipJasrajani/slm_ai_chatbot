@@ -233,17 +233,17 @@ void main() {
     expect(repository.indexedIds, isEmpty);
   });
 
-  test('bundled JSON files persist all 12 documents in SQLite', () async {
+  test('bundled JSON files persist all 144 documents in SQLite', () async {
     final source = _source(rootBundle);
     final documents = await source.loadDocuments();
-    expect(documents, hasLength(12));
-    expect(documents.map((document) => document.id).toSet(), hasLength(12));
+    expect(documents, hasLength(144));
+    expect(documents.map((document) => document.id).toSet(), hasLength(144));
 
     final errors = await rootBundle.loadString(_errors);
     final greetings = await rootBundle.loadString(_greetings);
     expect(
       (jsonDecode(errors) as Map<String, dynamic>)['documents'],
-      hasLength(3),
+      hasLength(135),
     );
     expect(
       (jsonDecode(greetings) as Map<String, dynamic>)['documents'],
@@ -261,8 +261,8 @@ void main() {
         ragRepository: _RecordingRagRepository(store: store),
       )();
 
-      expect(result.documentCount, 12);
-      expect((await store.getStats()).documentCount, 12);
+      expect(result.documentCount, 144);
+      expect((await store.getStats()).documentCount, 144);
     } finally {
       await store.close();
       await directory.delete(recursive: true);
@@ -343,6 +343,7 @@ class _RecordingRagRepository implements RagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0.0,
   }) async => [];

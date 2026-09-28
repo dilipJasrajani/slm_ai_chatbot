@@ -29,6 +29,29 @@ void main() {
     expect(const DocumentContextBuilder().build(documents), context);
   });
 
+  test('includes measures in grounded context when present', () {
+    const documents = [
+      KnowledgeDocument(
+        id: 'network-guide',
+        title: 'Network guide',
+        content: 'Check that Wi-Fi is enabled.',
+        measures: 'Reconnect the device to Wi-Fi.',
+        metadata: {'type': 'guide'},
+      ),
+    ];
+
+    final context = const DocumentContextBuilder().build(documents);
+
+    expect(
+      context,
+      contains(
+        'Content:\nCheck that Wi-Fi is enabled.'
+        '\n\nMeasures:\nReconnect the device to Wi-Fi.'
+        '\n\nMetadata:\ntype: guide',
+      ),
+    );
+  });
+
   test('returns empty context for no documents', () {
     expect(const DocumentContextBuilder().build(const []), isEmpty);
   });

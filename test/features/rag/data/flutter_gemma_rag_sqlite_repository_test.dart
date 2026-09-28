@@ -38,13 +38,171 @@ void main() {
     expect(runtime.query, 'The device cannot connect to the network.');
     expect(results.single.document.id, 'error-e123');
     expect(results.single.document.title, 'Device cannot connect to network');
+    expect(results.single.document.measures, isNull);
     expect(results.single.document.metadata, {'type': 'error', 'code': 'E123'});
   });
+
+  test('preserves measures in stored metadata and search results', () async {
+    final runtime = _FakeRagRuntime()
+      ..searchResults = const [
+        FlutterGemmaRagRuntimeResult(
+          id: 'error-e123',
+          content: 'Device cannot connect to network',
+          similarity: 0.98,
+          metadata:
+              '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","measures":"Check that Wi-Fi is enabled.","metadata":{"type":"error","code":"E123"}}}',
+        ),
+      ];
+    final repository = FlutterGemmaRagSqliteRepository(
+      databasePathProvider: () async => '/local/rag.db',
+      runtime: runtime,
+    );
+
+    await repository.indexDocuments([
+      const RagDocument(
+        document: KnowledgeDocument(
+          id: 'error-e123',
+          title: 'Device cannot connect to network',
+          content: 'The device failed to establish a network connection.',
+          measures: 'Check that Wi-Fi is enabled.',
+          metadata: {'type': 'error', 'code': 'E123'},
+        ),
+        searchableText: 'Device cannot connect to network',
+      ),
+    ]);
+    final results = await repository.search(query: 'network connection');
+
+    expect(
+      runtime.indexedDocuments.single.metadata,
+      '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","measures":"Check that Wi-Fi is enabled.","metadata":{"type":"error","code":"E123"}}}',
+    );
+    expect(results.single.document.measures, 'Check that Wi-Fi is enabled.');
+  });
+
+  test(
+    'returns an exact code match before semantic results that omit it',
+    () async {
+      final runtime = _FakeRagRuntime()
+        ..searchResults = const [
+          FlutterGemmaRagRuntimeResult(
+            id: 'error-e123',
+            content: 'Device cannot connect to network',
+            similarity: 0.98,
+            metadata:
+                '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","metadata":{"type":"error","code":"E123"}}}',
+          ),
+          FlutterGemmaRagRuntimeResult(
+            id: 'error-e456',
+            content: 'Device authentication failed',
+            similarity: 0.97,
+            metadata:
+                '{"_knowledgeDocument":{"title":"Device authentication failed","content":"Check device credentials.","metadata":{"type":"error","code":"E456"}}}',
+          ),
+        ];
+      final repository = FlutterGemmaRagSqliteRepository(
+        databasePathProvider: () async => '/local/rag.db',
+        runtime: runtime,
+      );
+      await repository.indexDocuments([
+        const RagDocument(
+          document: KnowledgeDocument(
+            id: 'F.838',
+            title: 'Inverter control fault',
+            content: 'Control of inverter faulty.',
+            metadata: {'type': 'error', 'code': 'F838'},
+          ),
+          searchableText: 'F838 inverter control fault',
+        ),
+      ]);
+
+      final results = await repository.search(
+        query: 'what is error f838?',
+        exactMatchQuery: 'what is error f838?',
+        topK: 2,
+      );
+
+      expect(runtime.query, 'what is error f838?');
+      expect(results.map((result) => result.document.id), [
+        'F.838',
+        'error-e123',
+        'error-e456',
+      ]);
+      expect(results.first.similarity, 1.0);
+    },
+  );
+
+  test(
+    'normalizes dotted, compact, and lowercase exact code queries',
+    () async {
+      final runtime = _FakeRagRuntime()..searchResults = const [];
+      final repository = FlutterGemmaRagSqliteRepository(
+        databasePathProvider: () async => '/local/rag.db',
+        runtime: runtime,
+      );
+      await repository.indexDocuments([
+        const RagDocument(
+          document: KnowledgeDocument(
+            id: 'F.838',
+            title: 'Inverter control fault',
+            content: 'Control of inverter faulty.',
+            metadata: {'type': 'error', 'code': 'F838'},
+          ),
+          searchableText: 'F838 inverter control fault',
+        ),
+      ]);
+
+      for (final query in ['F.838', 'F838', 'f838']) {
+        final results = await repository.search(
+          query: query,
+          exactMatchQuery: query,
+        );
+
+        expect(results.map((result) => result.document.id), ['F.838']);
+      }
+    },
+  );
+
+  test(
+    'keeps semantic-only results for unrelated queries without a code',
+    () async {
+      final runtime = _FakeRagRuntime();
+      final repository = FlutterGemmaRagSqliteRepository(
+        databasePathProvider: () async => '/local/rag.db',
+        runtime: runtime,
+      );
+      await repository.indexDocuments([
+        const RagDocument(
+          document: KnowledgeDocument(
+            id: 'F.838',
+            title: 'Inverter control fault',
+            content: 'Control of inverter faulty.',
+            metadata: {'type': 'error', 'code': 'F838'},
+          ),
+          searchableText: 'F838 inverter control fault',
+        ),
+      ]);
+
+      final results = await repository.search(
+        query: 'How do I connect the device to Wi-Fi?',
+      );
+
+      expect(results.map((result) => result.document.id), ['error-e123']);
+    },
+  );
 }
 
 class _FakeRagRuntime extends FlutterGemmaRagRuntime {
   final databasePaths = <String>[];
   final indexedDocuments = <_IndexedDocument>[];
+  List<FlutterGemmaRagRuntimeResult> searchResults = const [
+    FlutterGemmaRagRuntimeResult(
+      id: 'error-e123',
+      content: 'Device cannot connect to network',
+      similarity: 0.98,
+      metadata:
+          '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","metadata":{"type":"error","code":"E123"}}}',
+    ),
+  ];
   String? query;
 
   @override
@@ -70,15 +228,7 @@ class _FakeRagRuntime extends FlutterGemmaRagRuntime {
     required double threshold,
   }) async {
     this.query = query;
-    return const [
-      FlutterGemmaRagRuntimeResult(
-        id: 'error-e123',
-        content: 'Device cannot connect to network',
-        similarity: 0.98,
-        metadata:
-            '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","metadata":{"type":"error","code":"E123"}}}',
-      ),
-    ];
+    return searchResults;
   }
 }
 

@@ -13,10 +13,15 @@ class DocumentContextBuilder {
             'Knowledge Document ${entry.$1 + 1}',
             '',
             'Title:',
-            entry.$2.title,
+            '${entry.$2.id} ${entry.$2.title}',
             '',
             'Content:',
             entry.$2.content,
+            if (entry.$2.measures != null) ...[
+              '',
+              'Measures:',
+              entry.$2.measures!,
+            ],
             if (entry.$2.metadata.isNotEmpty) ...[
               '',
               'Metadata:',

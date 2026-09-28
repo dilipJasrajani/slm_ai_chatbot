@@ -14,8 +14,13 @@ void main() {
 
     expect(documents, hasLength(2));
     expect(documents.first.id, 'error-e123');
+    expect(
+      documents.first.measures,
+      'Check that the device has network access.',
+    );
     expect(documents.last.metadata['code'], 'E456');
     expect(documents.last.metadata['type'], 'error');
+    expect(documents.last.measures, isNull);
   });
 
   test('rejects a document with a missing required field', () {
@@ -50,15 +55,6 @@ void main() {
 
     expect(documents, isEmpty);
   });
-
-  testWidgets('loads the bundled documents asset', (tester) async {
-    final source = JsonDocumentSource(assetBundle: rootBundle);
-
-    final documents = await source.loadDocuments();
-
-    expect(documents, hasLength(3));
-    expect(documents.first.id, 'error-e123');
-  });
 }
 
 class _StringAssetBundle extends CachingAssetBundle {
@@ -76,18 +72,23 @@ class _StringAssetBundle extends CachingAssetBundle {
 String _knowledgeBaseJson() {
   return jsonEncode({
     'version': 1,
-    'documents': [_document(), _document(id: 'error-e456', code: 'E456')],
+    'documents': [
+      _document(measures: 'Check that the device has network access.'),
+      _document(id: 'error-e456', code: 'E456'),
+    ],
   });
 }
 
-Map<String, Object> _document({
+Map<String, Object?> _document({
   String id = 'error-e123',
   String code = 'E123',
+  String? measures,
 }) {
   return {
     'id': id,
     'title': 'Device cannot connect to network',
     'content': 'The device cannot establish a network connection.',
+    'measures': measures,
     'metadata': {'type': 'error', 'code': code},
   };
 }

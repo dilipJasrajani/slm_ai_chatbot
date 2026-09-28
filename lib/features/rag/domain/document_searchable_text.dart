@@ -7,11 +7,15 @@ class DocumentSearchableText {
   String format(KnowledgeDocument document) {
     final metadataKeys = document.metadata.keys.toList()..sort();
     final lines = [
+      'Id: ${document.id}',
       'Title: ${document.title}',
       '',
       'Content:',
       document.content,
     ];
+    if (document.measures != null) {
+      lines.addAll(['', 'Measures:', document.measures!]);
+    }
     if (document.metadata.isNotEmpty) {
       lines.addAll([
         '',

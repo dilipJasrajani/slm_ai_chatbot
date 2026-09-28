@@ -1,10 +1,12 @@
 import 'knowledge_document.dart';
+import 'knowledge_identifier_normalizer.dart';
 import 'rag_search_result.dart';
 
 /// Applies the existing lexical and identifier grounding rules to search hits.
 class RetrievedKnowledgeRelevance {
   const RetrievedKnowledgeRelevance();
 
+  static const _identifierNormalizer = KnowledgeIdentifierNormalizer();
   static final _tokenPattern = RegExp(r'[a-z0-9]+', caseSensitive: false);
   static const _ignoredTokens = {
     'about',
@@ -42,9 +44,13 @@ class RetrievedKnowledgeRelevance {
 
   List<KnowledgeDocument> relevantDocuments({
     required String question,
+    String? identifierQuestion,
     required Iterable<RagSearchResult> results,
   }) {
     final questionTokens = _meaningfulTokens(question);
+    final questionIdentifiers = _identifierNormalizer.extract(
+      identifierQuestion ?? question,
+    );
     return results
         .where(
           (result) =>
@@ -53,10 +59,7 @@ class RetrievedKnowledgeRelevance {
                     _documentTokens(result.document),
                   ) >=
                   2 ||
-              _sharesIdentifier(
-                questionTokens,
-                _documentTokens(result.document),
-              ),
+              _sharesIdentifier(questionIdentifiers, result.document),
         )
         .map((result) => result.document)
         .toList(growable: false);
@@ -104,14 +107,15 @@ class RetrievedKnowledgeRelevance {
   }
 
   bool _sharesIdentifier(
-    Set<String> questionTokens,
-    Set<String> documentTokens,
+    Set<String> questionIdentifiers,
+    KnowledgeDocument document,
   ) {
-    return questionTokens.any(
-      (questionToken) =>
-          questionToken.contains(RegExp(r'\d')) &&
-          documentTokens.contains(questionToken),
+    if (questionIdentifiers.isEmpty) return false;
+    final documentIdentifiers = _identifierNormalizer.extract(
+      '${document.id} ${document.title} ${document.content} '
+      '${document.metadata.values.join(' ')}',
     );
+    return questionIdentifiers.any(documentIdentifiers.contains);
   }
 
   bool _sameConcept(String first, String second) {

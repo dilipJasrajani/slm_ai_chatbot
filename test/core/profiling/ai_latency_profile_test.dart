@@ -346,6 +346,7 @@ class _Rag implements RagRepository {
   @override
   Future<List<RagSearchResult>> search({
     required String query,
+    String? exactMatchQuery,
     int topK = 1,
     double threshold = 0,
   }) async {
