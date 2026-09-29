@@ -12,8 +12,8 @@ Retrieval query
 EmbeddingGemma + SQLite vector search
  ↓
 Grounding
- ├── relevant → RAG prompt → Qwen3
- └── not relevant → restricted conversational prompt → Qwen3
+ ├── relevant → RAG prompt → selected local model
+ └── not relevant → restricted conversational prompt → selected local model
 ```
 
 The application runs these components on the device. `app/` contains the
@@ -58,7 +58,7 @@ RetrievedKnowledgeRelevance
  ↓
 LocalLlmService
  ↓
-Qwen3
+Selected local model
 ```
 
 `ChatController` turns the UI event and streamed answer into presentation
@@ -79,7 +79,7 @@ LocalLlmService
     ↓
 LocalLlmServiceImpl
     ↓
-flutter_gemma / Qwen3
+flutter_gemma / selected local model
 ```
 
 Both answer paths depend on the generic `LocalLlmService`. Its local
@@ -89,16 +89,17 @@ generated output from the active local model.
 ### Output processing
 
 ```text
-Qwen3 output
+Qwen3 output (when Qwen3 is selected)
     ↓
 Qwen3OutputChannelParser
     ↓
 clean assistant text
 ```
 
-`LocalLlmServiceImpl` sends every raw streamed chunk through
-`Qwen3OutputChannelParser`. The parser contains the Qwen3-specific channel
-protocol handling; callers receive only the resulting assistant text.
+When Qwen3 is selected, `LocalLlmServiceImpl` sends raw streamed chunks through
+`Qwen3OutputChannelParser` to remove Qwen3-specific channel markers. With
+Gemma 3, it streams the response directly without Qwen3 prompt directives or
+output parsing.
 
 ### Model lifecycle
 
@@ -111,12 +112,14 @@ LocalModelRepositoryImpl
 ```
 
 `LocalModelManager` coordinates download, loading, readiness, and error
-status. `LocalModelRepositoryImpl` performs the current local Qwen3 install
-and active-model loading. The composition root shares that loaded model with
-the local LLM service without making chat or RAG code depend on the model SDK.
-The Qwen3 runtime uses a 2048-token context so retrieved knowledge and a
-short answer fit together; its session prompt includes `/no_think` so the
-model does not spend its response budget on hidden reasoning.
+status. `LocalModelRepositoryImpl` installs the model selected in
+`features/model/data/local_model_configuration.dart` (bundled Gemma 3 1B IT
+or network-installed Qwen3) and loads it as the active model. The composition
+root shares that loaded model with the local LLM service without making chat
+or RAG code depend on the model SDK.
+The local runtime uses a 2048-token context so retrieved knowledge and a short
+answer fit together. Only Qwen3's session prompt includes `/no_think` to avoid
+spending its response budget on hidden reasoning.
 
 ## Local RAG
 
@@ -176,15 +179,15 @@ RagPromptBuilder
     ↓
 LocalLlmService
     ↓
-Qwen3
+Selected local model
     ↓
 answer
 ```
 
 `RagPromptBuilder` owns the unchanged grounded-answer prompt. The Chat
-orchestrator sends that prompt through the generic `LocalLlmService`; Qwen3
-generates the answer. EmbeddingGemma is used only for ingestion and retrieval,
-not answer generation.
+orchestrator sends that prompt through the generic `LocalLlmService`; the
+selected local model generates the answer. EmbeddingGemma is used only for
+ingestion and retrieval, not answer generation.
 
 ## Presentation and application composition
 
@@ -285,7 +288,8 @@ retrieval-first chat orchestrator, historical debug routing evaluation, and
 the chat UI.
 
 `features/llm` contains the generic local-generation abstraction and the
-Qwen3 generation implementation, including Qwen3 output-channel parsing.
+Gemma 3 / Qwen3 generation implementation, including Qwen3 output-channel
+parsing.
 
 `features/rag` contains knowledge documents, document ingestion, local
 embeddings, SQLite vector retrieval, grounding, RAG prompts, and retrieval
@@ -293,8 +297,8 @@ evaluation. Its `evaluation/` folder is non-runtime retrieval tooling, and its
 `support/` folder contains the inactive proof-of-concept
 screen and helper kept for reference.
 
-`features/model` contains Qwen3 model downloading, installation, lifecycle
-management, and model status.
+`features/model` contains the bundled Gemma 3 and optional Qwen3 model
+configuration, installation, lifecycle management, and model status.
 
 Within each feature, `domain` holds feature rules and abstractions, `data`
 holds local infrastructure implementations, and `presentation` holds Flutter

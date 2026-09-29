@@ -546,7 +546,7 @@ class _ModelStatusBanner extends StatelessWidget {
     final message = switch (state.status) {
       ModelStatus.notDownloaded => 'Preparing local AI model…',
       ModelStatus.downloading =>
-        'Downloading local AI model${state.downloadProgress == null ? '' : ': ${state.downloadProgress}%'}',
+        'Installing local AI model${state.downloadProgress == null ? '' : ': ${state.downloadProgress}%'}',
       ModelStatus.downloaded ||
       ModelStatus.loading => 'Loading local AI model…',
       ModelStatus.error =>

@@ -9,11 +9,14 @@ class LocalLlmServiceImpl implements LocalLlmService {
   LocalLlmServiceImpl({
     required Future<InferenceModel> Function() modelProvider,
     required Future<void> Function() releaseModel,
+    required bool usesQwen3Output,
   }) : _modelProvider = modelProvider,
-       _releaseModel = releaseModel;
+       _releaseModel = releaseModel,
+       _usesQwen3Output = usesQwen3Output;
 
   final Future<InferenceModel> Function() _modelProvider;
   final Future<void> Function() _releaseModel;
+  final bool _usesQwen3Output;
   InferenceModelSession? _activeSession;
 
   @override
@@ -37,16 +40,20 @@ class LocalLlmServiceImpl implements LocalLlmService {
     _activeSession = session;
 
     try {
-      // Direct sessions do not add Qwen3's /no_think directive like Chat does.
       await session.addQueryChunk(
-        Message(text: '$prompt /no_think', isUser: true),
+        Message(
+          text: _usesQwen3Output ? '$prompt /no_think' : prompt,
+          isUser: true,
+        ),
       );
       final rawOutput = _logRawOutput(
         session.getResponseAsync(),
         profile: profile,
         phase: generationPhase,
       );
-      final parsedOutput = Qwen3OutputChannelParser().parse(rawOutput);
+      final parsedOutput = _usesQwen3Output
+          ? const Qwen3OutputChannelParser().parse(rawOutput)
+          : rawOutput;
       yield* profile == null
           ? parsedOutput
           : parsedOutput.map((chunk) {
@@ -108,7 +115,7 @@ class LocalLlmServiceImpl implements LocalLlmService {
     await for (final chunk in output) {
       profile?.firstRawChunk(phase);
       if (kDebugMode && profile == null) {
-        debugPrint('[Qwen] Raw chunk characters: ${chunk.length}');
+        debugPrint('[Local LLM] Raw chunk characters: ${chunk.length}');
       }
       yield chunk;
     }

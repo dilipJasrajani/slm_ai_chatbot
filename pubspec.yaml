@@ -68,6 +68,7 @@ flutter:
     - assets/knowledge_base/
     - assets/evaluation/chat_intent_cases.json
     - assets/evaluation/retrieval_cases.json
+    - assets/models/gemma3-1b-it.litertlm
 
   # To add assets to your application, add an assets section, like this:
   # assets:

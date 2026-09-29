@@ -15,6 +15,7 @@ import 'package:slm_ai_chatbot/features/chat/evaluation/domain/evaluate_chat_int
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/llm/data/local_llm_service_impl.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
+import 'package:slm_ai_chatbot/features/model/data/local_model_configuration.dart';
 import 'package:slm_ai_chatbot/features/model/data/local_model_repository_impl.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_embedding_model_initializer.dart';
@@ -48,16 +49,21 @@ class AppDependencies {
 
 /// Wires domain abstractions to local implementations before the app starts.
 Future<AppDependencies> createAppDependencies() async {
+  const selectedModel = LocalModelConfiguration.active;
   final modelRepository = LocalModelRepositoryImpl(
+    configuration: selectedModel,
     downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
   );
-  const chatConfiguration = AiChatConfiguration();
+  final chatConfiguration = AiChatConfiguration(
+    modelLabel: selectedModel.label,
+  );
 
   // Lifecycle status and inference share one loaded local model.
   final modelManager = LocalModelManager(modelRepository);
   final LocalLlmService llmService = LocalLlmServiceImpl(
     modelProvider: () async => modelRepository.loadedModel,
     releaseModel: modelRepository.releaseLoadedModel,
+    usesQwen3Output: selectedModel.usesQwen3Output,
   );
 
   // RAG owns EmbeddingGemma preparation and SQLite vector-store access.

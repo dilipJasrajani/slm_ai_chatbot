@@ -219,6 +219,7 @@ void main() {
     final service = LocalLlmServiceImpl(
       modelProvider: () async => _Model(session),
       releaseModel: () async {},
+      usesQwen3Output: true,
     );
     final logs = <String>[];
     final profile = AiLatencyProfile(requestNumber: 7, log: logs.add);
@@ -236,6 +237,25 @@ void main() {
     expect(logs.join('\n'), isNot(contains('Sensitive prompt')));
   });
 
+  test(
+    'Gemma session uses the original prompt and streams unparsed output',
+    () async {
+      final session = _Session(output: Stream.value('<|channel|>final Answer'));
+      final service = LocalLlmServiceImpl(
+        modelProvider: () async => _Model(session),
+        releaseModel: () async {},
+        usesQwen3Output: false,
+      );
+
+      expect(
+        await service.generate('Sensitive prompt').join(),
+        '<|channel|>final Answer',
+      );
+      expect(session.query, 'Sensitive prompt');
+      expect(session.closed, isTrue);
+    },
+  );
+
   test('reads native counts and TTFT before closing the session', () async {
     final session = _Session(
       metrics: SessionMetrics(
@@ -250,6 +270,7 @@ void main() {
     final service = LocalLlmServiceImpl(
       modelProvider: () async => _Model(session),
       releaseModel: () async {},
+      usesQwen3Output: true,
     );
     final logs = <String>[];
     final profile = AiLatencyProfile(requestNumber: 9, log: logs.add);
@@ -273,6 +294,7 @@ void main() {
     final service = LocalLlmServiceImpl(
       modelProvider: () async => _Model(session),
       releaseModel: () async {},
+      usesQwen3Output: true,
     );
     final profile = AiLatencyProfile(requestNumber: 10, log: (_) {});
     final answer = AiLatencyProfile.run(profile, () async {

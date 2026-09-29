@@ -148,7 +148,7 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.textContaining('Downloading local AI model'), findsOneWidget);
+    expect(find.textContaining('Installing local AI model'), findsOneWidget);
     expect(find.textContaining('Preparing local knowledge'), findsNothing);
 
     repository.finishDownload.complete();

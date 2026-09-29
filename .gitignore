@@ -108,6 +108,12 @@ unlinked_spec.ds
 # Coverage
 coverage/
 
+# Locally supplied inference/embedding models must not enter source control.
+/assets/models/*.litertlm
+/assets/models/*.task
+/assets/models/*.bin
+/assets/models/*.tflite
+
 # Symbols
 app.*.symbols
 

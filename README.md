@@ -11,6 +11,24 @@ and can show retrieved local source titles. The chat only depends on domain
 interfaces; Gemma, embeddings, and SQLite remain behind data-layer adapters.
 The model must be ready before sending a message.
 
+## Select a local inference model
+
+The default inference model is **Gemma 3 1B IT** from
+`assets/models/gemma3-1b-it.litertlm`. Supply this file locally (it is ignored
+by Git) before building. Flutter bundles it into the app, then copies it into
+local model storage on first launch. Allow room for both copies on the device.
+No inference-model download is needed for Gemma.
+
+To use the existing Qwen3 0.6B network-installed model instead, set
+`LocalModelConfiguration.active = qwen3` in
+`lib/features/model/data/local_model_configuration.dart`, then restart the app.
+Set it back to `gemma3` to use the bundled model. That one selector controls
+installation, model type, chat label, and model-specific output processing.
+Switching to Qwen3 requires a one-time download if it has not been installed.
+The RAG embedding model is still downloaded separately on first use unless
+already installed; bundling Gemma alone does not make a fresh RAG installation
+entirely offline.
+
 ## Retrieval evaluation
 
 In debug builds, **Run Retrieval Evaluation (Debug)** indexes the bundled
