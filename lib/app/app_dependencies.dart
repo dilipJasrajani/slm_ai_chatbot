@@ -18,10 +18,12 @@ import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/data/local_model_configuration.dart';
 import 'package:slm_ai_chatbot/features/model/data/local_model_repository_impl.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
+import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_embedding_model_initializer.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_rag_sqlite_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/data/json_document_directory_source.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/ingest_documents_use_case.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/knowledge_base_preparation.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/data/json_retrieval_evaluation_dataset_source.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/evaluate_retrieval_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/retrieval_evaluation_runner.dart';
@@ -67,10 +69,11 @@ Future<AppDependencies> createAppDependencies() async {
   );
 
   // RAG owns EmbeddingGemma preparation and SQLite vector-store access.
+  final embeddingModelInitializer = FlutterGemmaEmbeddingModelInitializer(
+    downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
+  );
   final ragRepository = FlutterGemmaRagSqliteRepository(
-    prepareEmbeddingModel: FlutterGemmaEmbeddingModelInitializer(
-      downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
-    ).ensureReady,
+    prepareEmbeddingModel: embeddingModelInitializer.ensureReady,
     databasePathProvider: () async {
       final directory = await getApplicationSupportDirectory();
       return '${directory.path}/technical_support_rag.db';
@@ -100,6 +103,16 @@ Future<AppDependencies> createAppDependencies() async {
     ),
     ragRepository: ragRepository,
   );
+  final knowledgeBasePreparation = KnowledgeBasePreparation(
+    ensureGenerationModelReady: () async {
+      final state = await modelManager.ensureReady();
+      if (state.status != ModelStatus.ready) {
+        throw StateError('The local generation model is not ready.');
+      }
+    },
+    ensureEmbeddingModelReady: embeddingModelInitializer.ensureReady,
+    ingestDocuments: () => ingestDocuments(),
+  );
   final retrievalEvaluationRunner = RetrievalEvaluationRunner(
     ingestDocuments: ingestDocuments,
     datasetSource: JsonRetrievalEvaluationDatasetSource(
@@ -113,7 +126,7 @@ Future<AppDependencies> createAppDependencies() async {
     ),
     evaluateRouting: EvaluateChatIntentRoutingUseCase(router: chatIntentRouter),
   );
-  unawaited(modelManager.ensureReady());
+  knowledgeBasePreparation.startModelPreparation();
 
   return AppDependencies(
     modelManager: modelManager,
@@ -121,7 +134,7 @@ Future<AppDependencies> createAppDependencies() async {
     chatConfiguration: chatConfiguration,
     chatIntentEvaluationRunner: chatIntentEvaluationRunner,
     retrievalEvaluationRunner: retrievalEvaluationRunner,
-    prepareKnowledgeBase: () async => ingestDocuments(),
+    prepareKnowledgeBase: knowledgeBasePreparation.prepareKnowledgeBase,
     runtimeBackendLabel: () =>
         switch (FlutterGemmaPlugin.instance.initializedModel?.activeBackend) {
           PreferredBackend.cpu => 'CPU',
