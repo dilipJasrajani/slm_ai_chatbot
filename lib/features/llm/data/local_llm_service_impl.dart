@@ -52,7 +52,11 @@ class LocalLlmServiceImpl implements LocalLlmService {
         phase: generationPhase,
       );
       final parsedOutput = _usesQwen3Output
-          ? const Qwen3OutputChannelParser().parse(rawOutput)
+          ? Qwen3OutputChannelParser(
+              onDiagnostics: kDebugMode
+                  ? (summary) => debugPrint('[Qwen stream] $summary')
+                  : null,
+            ).parse(rawOutput)
           : rawOutput;
       yield* profile == null
           ? parsedOutput

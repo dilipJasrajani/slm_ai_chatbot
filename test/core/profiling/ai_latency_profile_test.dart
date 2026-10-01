@@ -311,6 +311,34 @@ void main() {
     expect(profile.elapsedAt(AiProfileEvent.firstParsedChunk), isNotNull);
   });
 
+  test('Qwen service streams post-think text before generation ends', () async {
+    final raw = StreamController<String>();
+    final service = LocalLlmServiceImpl(
+      modelProvider: () async => _Model(_Session(output: raw.stream)),
+      releaseModel: () async {},
+      usesQwen3Output: true,
+    );
+    final profile = AiLatencyProfile(requestNumber: 11, log: (_) {});
+    final chunks = <String>[];
+    final done = AiLatencyProfile.run(profile, () async {
+      profile.generationPhase = AiGenerationPhase.finalAnswer;
+      await for (final chunk in service.generate('Prompt')) {
+        chunks.add(chunk);
+      }
+    });
+
+    raw.add('<think>Hidden reasoning</think>Hello');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(chunks.join(), 'Hello');
+    expect(profile.elapsedAt(AiProfileEvent.firstParsedChunk), isNotNull);
+
+    raw.add(' there');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(chunks.join(), 'Hello there');
+    await raw.close();
+    await done;
+  });
+
   test('first rendered text is recorded once after presentation', () {
     final logs = <String>[];
     final profile = AiLatencyProfile(requestNumber: 8, log: logs.add);

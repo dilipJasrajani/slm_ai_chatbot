@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/llm/data/qwen3_output_channel_parser.dart';
 
@@ -67,6 +69,113 @@ void main() {
         .join();
 
     expect(output, 'The device is ready.');
+  });
+
+  test('reports unmarked output shape without logging answer text', () async {
+    final diagnostics = <String>[];
+    final output = await Qwen3OutputChannelParser(
+      onDiagnostics: diagnostics.add,
+    ).parse(Stream.fromIterable(['Private ', 'answer.'])).join();
+
+    expect(output, 'Private answer.');
+    expect(diagnostics.single, contains('channels=none'));
+    expect(diagnostics.single, contains('unmarkedPrefixCharacters=15'));
+    expect(diagnostics.single, contains('thinkCloseMs=none'));
+    expect(diagnostics.single, contains('firstPostThinkTextMs=none'));
+    expect(diagnostics.single, isNot(contains('Private')));
+    expect(diagnostics.single, isNot(contains('answer.')));
+  });
+
+  test('reports split thinking markers without logging thought text', () async {
+    final diagnostics = <String>[];
+    final output =
+        await Qwen3OutputChannelParser(onDiagnostics: diagnostics.add)
+            .parse(
+              Stream.fromIterable([
+                '<thi',
+                'nk>Private thought</think><|chan',
+                'nel|>thoughtHidden',
+                '<|channel|>finalVisible answer.',
+                '<|endoftext|>',
+              ]),
+            )
+            .join();
+
+    expect(output, 'Visible answer.');
+    expect(diagnostics.single, contains('channels=thought>final'));
+    expect(diagnostics.single, contains('thinkTags=1'));
+    expect(diagnostics.single, contains('endTokens=1'));
+    expect(diagnostics.single, matches(RegExp(r'thinkCloseMs=\d+')));
+    expect(diagnostics.single, matches(RegExp(r'firstPostThinkTextMs=\d+')));
+    expect(diagnostics.single, isNot(contains('Private')));
+    expect(diagnostics.single, isNot(contains('Hidden')));
+    expect(diagnostics.single, isNot(contains('Visible')));
+  });
+
+  test('measures only text after a closed think tag', () async {
+    final diagnostics = <String>[];
+    final output =
+        await Qwen3OutputChannelParser(onDiagnostics: diagnostics.add)
+            .parse(
+              Stream.fromIterable(['Prefix<think>Hidden</think>', 'Answer']),
+            )
+            .join();
+
+    expect(output, 'PrefixAnswer');
+    expect(diagnostics.single, contains('unmarkedPrefixCharacters=12'));
+    expect(diagnostics.single, matches(RegExp(r'thinkCloseMs=\d+')));
+    expect(diagnostics.single, matches(RegExp(r'firstPostThinkTextMs=\d+')));
+    expect(diagnostics.single, isNot(contains('Hidden')));
+  });
+
+  test('streams post-think text before the raw stream finishes', () async {
+    final raw = StreamController<String>();
+    final chunks = <String>[];
+    final done = parser.parse(raw.stream).listen(chunks.add).asFuture<void>();
+
+    raw.add('<thi');
+    raw.add('nk>Hidden reasoning</th');
+    raw.add('ink>Hello');
+    await Future<void>.delayed(Duration.zero);
+    expect(chunks.join(), 'Hello');
+
+    raw.add(', world!');
+    await Future<void>.delayed(Duration.zero);
+    expect(chunks.join(), 'Hello, world!');
+
+    await raw.close();
+    await done;
+    expect(chunks.join(), 'Hello, world!');
+  });
+
+  test(
+    'keeps pre-think text buffered and hidden by a later final marker',
+    () async {
+      final output = await parser
+          .parse(
+            Stream.fromIterable([
+              'Private preamble',
+              '<think>Hidden reasoning</think>More preamble',
+              '<|channel|>finalVisible answer.',
+            ]),
+          )
+          .join();
+
+      expect(output, 'Visible answer.');
+    },
+  );
+
+  test('suppresses later think blocks during post-think streaming', () async {
+    final output = await parser
+        .parse(
+          Stream.fromIterable([
+            '<think>Hidden first</think>Visible',
+            '<think>Hidden second</think> answer',
+          ]),
+        )
+        .join();
+
+    expect(output, 'Visible answer');
   });
 
   test('does not leak thought text or markers into final output', () async {
