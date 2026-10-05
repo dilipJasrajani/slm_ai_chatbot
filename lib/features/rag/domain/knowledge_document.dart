@@ -5,6 +5,7 @@ class KnowledgeDocument {
     required this.title,
     required this.content,
     this.measures,
+    this.searchText,
     required this.metadata,
   });
 
@@ -12,5 +13,6 @@ class KnowledgeDocument {
   final String title;
   final String content;
   final String? measures;
+  final String? searchText;
   final Map<String, dynamic> metadata;
 }

@@ -79,6 +79,43 @@ void main() {
     expect(results.single.document.measures, 'Check that Wi-Fi is enabled.');
   });
 
+  test('stores retrieval-only text separately from answer content', () async {
+    final runtime = _FakeRagRuntime()
+      ..searchResults = const [
+        FlutterGemmaRagRuntimeResult(
+          id: 'card:msg:f_74',
+          content: 'Pressure is low',
+          similarity: 0.9,
+          metadata:
+              '{"_knowledgeDocument":{"title":"FAULT F.74","content":"Pressure is low","searchText":"water gauge low","metadata":{"code":"F.74"}}}',
+        ),
+      ];
+    final repository = FlutterGemmaRagSqliteRepository(
+      databasePathProvider: () async => '/local/rag.db',
+      runtime: runtime,
+    );
+    await repository.indexDocuments([
+      const RagDocument(
+        document: KnowledgeDocument(
+          id: 'card:msg:f_74',
+          title: 'FAULT F.74',
+          content: 'Pressure is low',
+          searchText: 'water gauge low',
+          metadata: {'code': 'F.74'},
+        ),
+        searchableText: 'water gauge low\nPressure is low',
+      ),
+    ]);
+    final result = (await repository.search(query: 'water gauge low')).single;
+
+    expect(
+      runtime.indexedDocuments.single.metadata,
+      contains('"searchText":"water gauge low"'),
+    );
+    expect(result.document.searchText, 'water gauge low');
+    expect(result.document.content, 'Pressure is low');
+  });
+
   test(
     'returns an exact code match before semantic results that omit it',
     () async {

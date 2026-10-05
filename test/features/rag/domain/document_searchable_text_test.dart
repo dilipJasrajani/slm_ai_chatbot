@@ -40,4 +40,21 @@ void main() {
       ),
     );
   });
+
+  test(
+    'prioritizes retrieval phrasings without adding them to factual content',
+    () {
+      const document = KnowledgeDocument(
+        id: 'card:msg:f_74',
+        title: 'FAULT F.74',
+        content: 'Cause: Hydraulic pressure too low.',
+        searchText: 'Pressure drops after refill',
+        metadata: {'code': 'F.74'},
+      );
+
+      final text = const DocumentSearchableText().format(document);
+      expect(text.indexOf('Pressure drops'), lessThan(text.indexOf('Cause:')));
+      expect(document.content, isNot(contains('Pressure drops')));
+    },
+  );
 }

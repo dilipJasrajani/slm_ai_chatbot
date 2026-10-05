@@ -11,6 +11,34 @@ and can show retrieved local source titles. The chat only depends on domain
 interfaces; Gemma, embeddings, and SQLite remain behind data-layer adapters.
 The model must be ready before sending a message.
 
+## Local knowledge-base JSON
+
+Place JSON assets directly in `assets/knowledge_base/` and rebuild the app.
+On knowledge-base preparation, the app loads all JSON files in that directory
+and indexes their records in the local SQLite vector store. The bundled
+`kb_mobile_v1_1.json` contributes 425 source passages and 408 linked cards
+alongside 9 conversation documents.
+Cards retain manual page numbers and source-passage IDs; their alternative
+phrasings are used for retrieval but are not presented as factual answer text.
+
+The existing `{"version": 1, "documents": [...]}` format remains supported.
+Other files can be a JSON array of objects, an object with `entries` or
+`documents` arrays, an object containing top-level arrays of records, or a
+single JSON object. Each record is indexed separately; a record's `id` is
+used when present, otherwise its file path and position provide an ID. Its
+`title`, `name`, or `code` provides a display title when present. `text` or
+`content` provides answer content; otherwise fields are serialized as labeled
+content. Non-object records and duplicate IDs fail ingestion explicitly.
+Nested JSON is retained as text within a record rather than automatically
+split into separate documents. For reliable retrieval and readable answers,
+prefer small, self-contained records with stable IDs, explicit titles, and
+verified factual content. Adding a new file requires rebuilding the app and
+re-indexing; the embedding model must be installed before offline indexing.
+The app saves a fingerprint of the bundled JSON and embedding model alongside
+the SQLite database. On later launches it opens the existing index and
+restores exact-code lookup without re-embedding documents. Editing the KB,
+changing the embedding model, or deleting the database triggers a full rebuild.
+
 ## Select a local inference model
 
 The default inference model is **Gemma 3 1B IT** from

@@ -22,6 +22,7 @@ import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_embedding_model_initializer.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_rag_sqlite_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/data/json_document_directory_source.dart';
+import 'package:slm_ai_chatbot/features/rag/data/persistent_knowledge_index.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/ingest_documents_use_case.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_base_preparation.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/data/json_retrieval_evaluation_dataset_source.dart';
@@ -72,12 +73,11 @@ Future<AppDependencies> createAppDependencies() async {
   final embeddingModelInitializer = FlutterGemmaEmbeddingModelInitializer(
     downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
   );
+  final supportDirectory = await getApplicationSupportDirectory();
+  final databasePath = '${supportDirectory.path}/technical_support_rag.db';
   final ragRepository = FlutterGemmaRagSqliteRepository(
     prepareEmbeddingModel: embeddingModelInitializer.ensureReady,
-    databasePathProvider: () async {
-      final directory = await getApplicationSupportDirectory();
-      return '${directory.path}/technical_support_rag.db';
-    },
+    databasePathProvider: () async => databasePath,
   );
   final chatIntentRouter = LocalLlmChatIntentRouter(
     llmService: llmService,
@@ -96,11 +96,21 @@ Future<AppDependencies> createAppDependencies() async {
       maxMessages: chatConfiguration.maxHistoryMessages,
     ),
   );
+  final documentSource = JsonDocumentDirectorySource(
+    assetBundle: rootBundle,
+    assetDirectory: 'assets/knowledge_base/',
+  );
   final ingestDocuments = IngestDocumentsUseCase(
-    documentSource: JsonDocumentDirectorySource(
-      assetBundle: rootBundle,
-      assetDirectory: 'assets/knowledge_base/',
-    ),
+    documentSource: documentSource,
+    ragRepository: ragRepository,
+  );
+  final persistentIndex = PersistentKnowledgeIndex(
+    assetBundle: rootBundle,
+    assetDirectory: 'assets/knowledge_base/',
+    databasePath: databasePath,
+    embeddingIdentity: FlutterGemmaEmbeddingModelInitializer.indexIdentity,
+    documentSource: documentSource,
+    ingestDocuments: ingestDocuments,
     ragRepository: ragRepository,
   );
   final knowledgeBasePreparation = KnowledgeBasePreparation(
@@ -111,10 +121,10 @@ Future<AppDependencies> createAppDependencies() async {
       }
     },
     ensureEmbeddingModelReady: embeddingModelInitializer.ensureReady,
-    ingestDocuments: () => ingestDocuments(),
+    ingestDocuments: persistentIndex.prepare,
   );
   final retrievalEvaluationRunner = RetrievalEvaluationRunner(
-    ingestDocuments: ingestDocuments,
+    prepareIndex: persistentIndex.prepare,
     datasetSource: JsonRetrievalEvaluationDatasetSource(
       assetBundle: rootBundle,
     ),

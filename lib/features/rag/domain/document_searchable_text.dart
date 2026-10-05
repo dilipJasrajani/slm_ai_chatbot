@@ -9,6 +9,11 @@ class DocumentSearchableText {
     final lines = [
       'Id: ${document.id}',
       'Title: ${document.title}',
+      if (document.searchText != null) ...[
+        '',
+        'Search terms:',
+        document.searchText!,
+      ],
       '',
       'Content:',
       document.content,

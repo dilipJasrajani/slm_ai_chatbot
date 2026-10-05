@@ -41,6 +41,24 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     await _runtime.initializeVectorStore(databasePath);
   }
 
+  Future<int> indexedDocumentCount() async {
+    await initialize();
+    return (await _runtime.getVectorStoreStats()).documentCount;
+  }
+
+  Future<void> clearIndex() async {
+    await initialize();
+    await _runtime.clearVectorStore();
+    _documentsByIdentifier.clear();
+  }
+
+  void restoreIdentifiers(Iterable<KnowledgeDocument> documents) {
+    _documentsByIdentifier.clear();
+    for (final document in documents) {
+      _indexIdentifiers(document);
+    }
+  }
+
   @override
   Future<void> indexDocuments(Iterable<RagDocument> documents) async {
     await initialize();
@@ -56,6 +74,8 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
             'content': document.document.content,
             if (document.document.measures != null)
               'measures': document.document.measures,
+            if (document.document.searchText != null)
+              'searchText': document.document.searchText,
             'metadata': document.document.metadata,
           },
         }),
@@ -141,6 +161,7 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
       final title = document['title'];
       final content = document['content'];
       final measures = document['measures'];
+      final searchText = document['searchText'];
       final metadata = document['metadata'];
       if (title is String && content is String && metadata is Map) {
         return KnowledgeDocument(
@@ -148,6 +169,7 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
           title: title,
           content: content,
           measures: measures is String ? measures : null,
+          searchText: searchText is String ? searchText : null,
           metadata: Map<String, dynamic>.from(metadata),
         );
       }
@@ -174,6 +196,14 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
 class FlutterGemmaRagRuntime {
   Future<void> initializeVectorStore(String databasePath) {
     return FlutterGemmaPlugin.instance.initializeVectorStore(databasePath);
+  }
+
+  Future<VectorStoreStats> getVectorStoreStats() {
+    return FlutterGemmaPlugin.instance.getVectorStoreStats();
+  }
+
+  Future<void> clearVectorStore() {
+    return FlutterGemmaPlugin.instance.clearVectorStore();
   }
 
   Future<void> addDocument({

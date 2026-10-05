@@ -67,7 +67,8 @@ class RetrievedKnowledgeRelevance {
 
   Set<String> _documentTokens(KnowledgeDocument document) {
     return _meaningfulTokens(
-      '${document.id} ${document.title} ${document.content} ${document.metadata.values.join(' ')}',
+      '${document.id} ${document.title} ${document.content} '
+      '${document.searchText ?? ''} ${document.metadata.values.join(' ')}',
     );
   }
 

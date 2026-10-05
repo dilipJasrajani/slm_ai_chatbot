@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../domain/document_source.dart';
 import '../domain/knowledge_document.dart';
+import 'json_knowledge_records.dart';
 
 class JsonDocumentSource implements DocumentSource {
   JsonDocumentSource({
@@ -19,7 +20,12 @@ class JsonDocumentSource implements DocumentSource {
   Future<List<KnowledgeDocument>> loadDocuments() async {
     final source = await _loadSource();
     final decoded = _decodeSource(source);
-    return _parseDocuments(decoded);
+    if (decoded is Map<String, dynamic> &&
+        decoded['version'] is int &&
+        decoded.containsKey('documents')) {
+      return _parseDocuments(decoded);
+    }
+    return JsonKnowledgeRecords(assetPath: assetPath).parse(decoded);
   }
 
   Future<String> _loadSource() async {

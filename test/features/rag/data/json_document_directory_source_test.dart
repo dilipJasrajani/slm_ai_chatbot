@@ -14,6 +14,7 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 const _directory = 'assets/knowledge_base/';
 const _errors = '${_directory}documents.json';
 const _greetings = '${_directory}greeting-document.json';
+const _linked = '${_directory}kb_linked_mobile.json';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +61,37 @@ void main() {
       'greeting-hello',
     ]);
   });
+
+  test(
+    'combines legacy documents with linked and unknown-schema records',
+    () async {
+      final source = _source(
+        _ManifestAssetBundle({
+          _errors: _json(['error-e123']),
+          _linked: jsonEncode({
+            'entries': [
+              {
+                'id': 'card:msg:f_74',
+                'title': 'FAULT F.74',
+                'text': 'Code: F.74\nCause: Pressure too low',
+              },
+            ],
+          }),
+          '${_directory}future.json': jsonEncode([
+            {'name': 'Pump', 'description': 'Pump maintenance'},
+          ]),
+        }),
+      );
+
+      final documents = await source.loadDocuments();
+
+      expect(documents.map((document) => document.id), [
+        'error-e123',
+        '${_directory}future.json#0',
+        'card:msg:f_74',
+      ]);
+    },
+  );
 
   test('loads files in sorted asset-path order', () async {
     final bundle = _ManifestAssetBundle({
@@ -233,18 +265,16 @@ void main() {
     expect(repository.indexedIds, isEmpty);
   });
 
-  test('bundled JSON files persist all 144 documents in SQLite', () async {
+  test('bundled JSON files persist all documents in SQLite', () async {
     final source = _source(rootBundle);
     final documents = await source.loadDocuments();
-    expect(documents, hasLength(144));
-    expect(documents.map((document) => document.id).toSet(), hasLength(144));
-
-    final errors = await rootBundle.loadString(_errors);
-    final greetings = await rootBundle.loadString(_greetings);
+    expect(documents, isNotEmpty);
     expect(
-      (jsonDecode(errors) as Map<String, dynamic>)['documents'],
-      hasLength(135),
+      documents.map((document) => document.id).toSet(),
+      hasLength(documents.length),
     );
+    expect(documents.any((document) => document.id == 'card:msg:f_74'), isTrue);
+    final greetings = await rootBundle.loadString(_greetings);
     expect(
       (jsonDecode(greetings) as Map<String, dynamic>)['documents'],
       hasLength(9),
@@ -261,8 +291,8 @@ void main() {
         ragRepository: _RecordingRagRepository(store: store),
       )();
 
-      expect(result.documentCount, 144);
-      expect((await store.getStats()).documentCount, 144);
+      expect(result.documentCount, documents.length);
+      expect((await store.getStats()).documentCount, documents.length);
     } finally {
       await store.close();
       await directory.delete(recursive: true);

@@ -17,7 +17,7 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
   InferenceModel? _loadedModel;
 
   Future<InferenceModel> get loadedModel async {
-    return _loadedModel ??= await FlutterGemma.getActiveModel(maxTokens: 2048);
+    return _loadedModel ??= await FlutterGemma.getActiveModel(maxTokens: 1024 * 10);
   }
 
   @override

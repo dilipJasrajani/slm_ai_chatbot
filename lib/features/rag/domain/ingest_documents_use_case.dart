@@ -2,6 +2,7 @@ import 'document_searchable_text.dart';
 import 'document_source.dart';
 import 'rag_document.dart';
 import 'rag_repository.dart';
+import 'knowledge_document.dart';
 
 enum DocumentIngestionStage { loading, loaded, indexing, ready }
 
@@ -45,6 +46,13 @@ class IngestDocumentsUseCase {
       ),
     );
     final documents = await _documentSource.loadDocuments();
+    return indexDocuments(documents, onProgress: onProgress);
+  }
+
+  Future<DocumentIngestionResult> indexDocuments(
+    List<KnowledgeDocument> documents, {
+    void Function(DocumentIngestionProgress progress)? onProgress,
+  }) async {
     onProgress?.call(
       DocumentIngestionProgress(
         stage: DocumentIngestionStage.loaded,

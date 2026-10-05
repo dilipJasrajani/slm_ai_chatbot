@@ -55,6 +55,112 @@ void main() {
 
     expect(documents, isEmpty);
   });
+
+  test(
+    'loads linked passages and message cards without exposing phrasings as facts',
+    () async {
+      final source = JsonDocumentSource(
+        assetBundle: _StringAssetBundle(
+          jsonEncode({
+            'metadata': {'source': 'Service manual'},
+            'entries': [
+              {
+                'id': 'passage:p1',
+                'type': 'passage',
+                'title': 'Service instructions',
+                'text': 'Isolate power before servicing.',
+                'pages': [1],
+              },
+              {
+                'id': 'card:msg:f_74',
+                'type': 'card',
+                'entity_type': 'message',
+                'title': 'FAULT F.74',
+                'text': 'Code: F.74\nCause: Pressure too low',
+                'phrasings': ['Pressure keeps dropping after refill'],
+                'source_passage_ids': ['passage:p1'],
+                'pages': [74],
+              },
+            ],
+          }),
+        ),
+      );
+
+      final documents = await source.loadDocuments();
+
+      expect(documents, hasLength(2));
+      expect(documents.last.metadata['code'], 'F.74');
+      expect(documents.last.metadata['pages'], [74]);
+      expect(documents.last.metadata['source_passage_ids'], ['passage:p1']);
+      expect(documents.last.searchText, 'Pressure keeps dropping after refill');
+      expect(
+        documents.last.content,
+        isNot(contains('Pressure keeps dropping')),
+      );
+    },
+  );
+
+  test('indexes unknown JSON records with stable asset-scoped IDs', () async {
+    final source = JsonDocumentSource(
+      assetPath: 'assets/knowledge_base/new.json',
+      assetBundle: _StringAssetBundle(
+        jsonEncode({
+          'release': '2026',
+          'faults': [
+            {
+              'name': 'Low pressure',
+              'details': {'cause': 'Water loss'},
+              'steps': ['Fill', 'Vent'],
+            },
+          ],
+          'parts': [
+            {'code': 'X123', 'description': 'Temperature probe'},
+          ],
+        }),
+      ),
+    );
+
+    final documents = await source.loadDocuments();
+
+    expect(documents.map((document) => document.id), [
+      'assets/knowledge_base/new.json#faults/0',
+      'assets/knowledge_base/new.json#parts/0',
+    ]);
+    expect(documents.first.title, 'Low pressure');
+    expect(documents.first.content, contains('Water loss'));
+    expect(documents.first.content, contains('Vent'));
+    expect(documents.last.metadata['code'], 'X123');
+  });
+
+  test('rejects non-object records instead of silently skipping them', () {
+    final source = JsonDocumentSource(
+      assetBundle: _StringAssetBundle(
+        jsonEncode([
+          {'name': 'Valid', 'description': 'Text'},
+          4,
+        ]),
+      ),
+    );
+    expect(source.loadDocuments, throwsFormatException);
+  });
+
+  test('supports other versioned JSON schemas', () async {
+    final source = JsonDocumentSource(
+      assetBundle: _StringAssetBundle(
+        jsonEncode({
+          'version': 2,
+          'articles': [
+            {'title': 'Circulation', 'detail': 'Check the pump.'},
+          ],
+        }),
+      ),
+    );
+
+    expect(
+      (await source.loadDocuments()).single.content,
+      contains('Check the pump.'),
+    );
+  });
 }
 
 class _StringAssetBundle extends CachingAssetBundle {

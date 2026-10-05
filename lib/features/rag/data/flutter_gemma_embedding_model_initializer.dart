@@ -13,6 +13,7 @@ class FlutterGemmaEmbeddingModelInitializer {
   static const _tokenizerUrl =
       'https://huggingface.co/litert-community/embeddinggemma-300m/resolve/main/'
       'sentencepiece.model';
+  static const indexIdentity = '$_modelUrl|$_tokenizerUrl';
 
   final String? _downloadToken;
   Future<void>? _initialization;

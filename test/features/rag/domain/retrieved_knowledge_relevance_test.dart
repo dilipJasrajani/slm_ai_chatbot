@@ -85,4 +85,26 @@ void main() {
       );
     }
   });
+
+  test('uses search-only phrasings to ground paraphrases', () {
+    const document = KnowledgeDocument(
+      id: 'card:msg:f_74',
+      title: 'FAULT F.74',
+      content: 'Cause: Hydraulic pressure too low.',
+      searchText: 'water gauge reads low and the heat pump stops',
+      metadata: {'code': 'F.74'},
+    );
+    expect(
+      relevance
+          .relevantDocuments(
+            question: 'My water gauge reads low',
+            results: [
+              const RagSearchResult(document: document, similarity: 0.8),
+            ],
+          )
+          .single
+          .id,
+      document.id,
+    );
+  });
 }

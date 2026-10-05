@@ -5,14 +5,20 @@ import 'retrieval_evaluation_result.dart';
 
 class RetrievalEvaluationRunner {
   RetrievalEvaluationRunner({
-    required IngestDocumentsUseCase ingestDocuments,
+    required Future<void> Function({
+      void Function(DocumentIngestionProgress progress)? onProgress,
+    })
+    prepareIndex,
     required RetrievalEvaluationDatasetSource datasetSource,
     required EvaluateRetrievalUseCase evaluateRetrieval,
-  }) : _ingestDocuments = ingestDocuments,
+  }) : _prepareIndex = prepareIndex,
        _datasetSource = datasetSource,
        _evaluateRetrieval = evaluateRetrieval;
 
-  final IngestDocumentsUseCase _ingestDocuments;
+  final Future<void> Function({
+    void Function(DocumentIngestionProgress progress)? onProgress,
+  })
+  _prepareIndex;
   final RetrievalEvaluationDatasetSource _datasetSource;
   final EvaluateRetrievalUseCase _evaluateRetrieval;
 
@@ -20,7 +26,7 @@ class RetrievalEvaluationRunner {
     int topK = 3,
     void Function(DocumentIngestionProgress progress)? onIngestionProgress,
   }) async {
-    await _ingestDocuments(onProgress: onIngestionProgress);
+    await _prepareIndex(onProgress: onIngestionProgress);
     final dataset = await _datasetSource.loadDataset();
     return _evaluateRetrieval(dataset.cases, topK: topK);
   }
