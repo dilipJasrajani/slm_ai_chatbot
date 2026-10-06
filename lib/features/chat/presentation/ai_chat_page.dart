@@ -45,6 +45,7 @@ class AiChatPage extends StatefulWidget {
   final String? Function()? runtimeBackendLabel;
 
   @override
+  /// Creates the state object that coordinates this chat screen.
   State<AiChatPage> createState() => _AiChatPageState();
 }
 
@@ -65,6 +66,7 @@ class _AiChatPageState extends State<AiChatPage> {
   var _isRunningEvaluation = false;
   double? _bottomInset;
 
+  /// Resolves the configured theme once per source theme and color scheme.
   AiChatTheme get _theme {
     final colorScheme = Theme.of(context).colorScheme;
     if (!identical(_themeSource, widget.chatTheme) ||
@@ -77,6 +79,7 @@ class _AiChatPageState extends State<AiChatPage> {
   }
 
   @override
+  /// Creates or adopts the chat controller, then observes state and scrolling.
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
@@ -92,6 +95,7 @@ class _AiChatPageState extends State<AiChatPage> {
   }
 
   @override
+  /// Releases page-owned controllers and stops observing transient UI state.
   void dispose() {
     _pendingVisibleItems.clear();
     _controller.removeListener(_onStateChanged);
@@ -102,6 +106,7 @@ class _AiChatPageState extends State<AiChatPage> {
   }
 
   @override
+  /// Keeps the newest content visible when the keyboard opens during a chat.
   void didChangeDependencies() {
     super.didChangeDependencies();
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -113,6 +118,7 @@ class _AiChatPageState extends State<AiChatPage> {
     _bottomInset = bottomInset;
   }
 
+  /// Rebuilds for controller updates and resets transient message state on clear.
   void _onStateChanged() {
     if (!mounted) return;
     if (_controller.state.messages.isEmpty) {
@@ -124,6 +130,7 @@ class _AiChatPageState extends State<AiChatPage> {
     _scheduleScroll();
   }
 
+  /// Tracks whether the user remains close enough to the bottom to auto-scroll.
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     _shouldAutoScroll =
@@ -138,6 +145,7 @@ class _AiChatPageState extends State<AiChatPage> {
     }
   }
 
+  /// Scrolls after the current frame while preserving the user's reading position.
   void _scheduleScroll({bool force = false}) {
     if (!_shouldAutoScroll || _scrollScheduled) return;
     _scrollScheduled = true;
@@ -167,6 +175,7 @@ class _AiChatPageState extends State<AiChatPage> {
     });
   }
 
+  /// Rechecks every pending assistant response after scrolling or layout changes.
   void _checkPendingVisibleText() {
     for (final entry in _pendingVisibleItems.entries.toList(growable: false)) {
       _recordVisibleTextIfPainted(
@@ -177,6 +186,7 @@ class _AiChatPageState extends State<AiChatPage> {
     }
   }
 
+  /// Defers a visibility measurement until the assistant content has been laid out.
   void _checkVisibleAfterFrame(
     String messageId,
     int requestNumber,
@@ -187,6 +197,7 @@ class _AiChatPageState extends State<AiChatPage> {
     });
   }
 
+  /// Records latency when pending assistant text first overlaps the chat viewport.
   void _recordVisibleTextIfPainted(
     String messageId,
     int requestNumber,
@@ -221,6 +232,7 @@ class _AiChatPageState extends State<AiChatPage> {
     _pendingVisibleItems.remove(messageId);
   }
 
+  /// Starts observing a streamed response until its first text becomes visible.
   void _watchFirstVisibleText(
     String messageId,
     int requestNumber,
@@ -244,6 +256,7 @@ class _AiChatPageState extends State<AiChatPage> {
     }
   }
 
+  /// Returns a cached message widget or creates one with current display options.
   Widget _messageAt(ChatMessage message, {required bool isLatestAssistant}) {
     final pendingRequestNumber = _controller.pendingRenderedRequestNumber(
       message.id,
@@ -303,6 +316,7 @@ class _AiChatPageState extends State<AiChatPage> {
     );
   }
 
+  /// Sends the current composer text when chat input is currently available.
   void _send() {
     final text = _composerController.text;
     if (_isRunningEvaluation ||
@@ -314,11 +328,13 @@ class _AiChatPageState extends State<AiChatPage> {
     _controller.send(text);
   }
 
+  /// Restarts a failed assistant response when chat input is currently available.
   void _retry(ChatMessage message) {
     if (!_controller.state.canSend || _isRunningEvaluation) return;
     _controller.retry(message);
   }
 
+  /// Regenerates an assistant response and surfaces any restoration error.
   Future<void> _regenerate(ChatMessage message) async {
     final error = await _controller.regenerate(message);
     if (mounted && error != null) {
@@ -329,6 +345,7 @@ class _AiChatPageState extends State<AiChatPage> {
   }
 
   @override
+  /// Composes the app bar, status banners, conversation content, and composer.
   Widget build(BuildContext context) {
     final state = _controller.state;
     final chatTheme = _theme;
@@ -449,6 +466,7 @@ class _AiChatPageState extends State<AiChatPage> {
     );
   }
 
+  /// Runs debug-only CHAT-versus-KNOWLEDGE routing evaluation and shows its summary.
   Future<void> _runRoutingEvaluation() async {
     final runner = widget.chatIntentEvaluationRunner;
     if (runner == null || _isRunningEvaluation || _controller.state.isTyping) {
@@ -473,6 +491,7 @@ class _AiChatPageState extends State<AiChatPage> {
     }
   }
 
+  /// Runs debug-only retrieval evaluation and shows its result summary.
   Future<void> _runEvaluation() async {
     final runner = widget.retrievalEvaluationRunner;
     if (runner == null || _isRunningEvaluation || _controller.state.isTyping) {
