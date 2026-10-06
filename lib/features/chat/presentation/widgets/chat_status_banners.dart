@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 
 import '../ai_chat_configuration.dart';
-import '../chat_models.dart';
+import '../cubit/chat_state.dart';
 
 /// Shows local model installation, loading, and failure state.
 class ModelStatusBanner extends StatelessWidget {

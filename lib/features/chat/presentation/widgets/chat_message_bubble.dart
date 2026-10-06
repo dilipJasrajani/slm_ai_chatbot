@@ -6,7 +6,7 @@ import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
 
 import '../ai_chat_configuration.dart';
 import '../assistant_content.dart';
-import '../chat_models.dart';
+import '../models/chat_message.dart';
 
 /// Renders one user or assistant message, including its available actions.
 class ChatMessageBubble extends StatelessWidget {

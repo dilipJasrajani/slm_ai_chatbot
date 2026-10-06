@@ -22,7 +22,8 @@ void main() {
     final context = const DocumentContextBuilder().build(documents);
 
     expect(context, contains('Knowledge Document 1'));
-    expect(context, contains('Title:\nNetwork guide'));
+    expect(context, contains('Title:\nnetwork-guide Network guide'));
+    expect(context, contains('Title:\nfaq-1 Connection FAQ'));
     expect(context, contains('Content:\nCheck that Wi-Fi is enabled.'));
     expect(context, contains('priority: 1\ntype: guide'));
     expect(context, contains('Knowledge Document 2'));

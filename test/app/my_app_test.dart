@@ -8,8 +8,8 @@ import 'package:slm_ai_chatbot/app/app.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_page.dart';
-import 'package:slm_ai_chatbot/features/chat/presentation/chat_controller.dart';
-import 'package:slm_ai_chatbot/features/chat/presentation/chat_models.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/models/chat_message.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';
@@ -52,13 +52,22 @@ void main() {
       isNull,
     );
 
-    const prompt = 'How do I troubleshoot a network connection?';
+    const prompt = 'How do I troubleshoot a Communication error PlusBus?';
     await tester.tap(find.text(prompt));
     await tester.pump();
     await tester.pump();
     expect(find.text(prompt), findsOneWidget);
     expect(find.text('How can I help?'), findsNothing);
-    expect(find.text('Thinking…'), findsOneWidget);
+    expect(find.text('Thinking '), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == 'Thinking…' &&
+            widget.properties.liveRegion == true,
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(ActionChip), findsNothing);
     expect(repository.searchCount, 1);
     expect(generations, 1);
@@ -68,7 +77,8 @@ void main() {
     await response.close();
     await tester.pumpAndSettle();
     expect(find.text('Check the connection.'), findsOneWidget);
-    expect(find.text('Sources · 1'), findsOneWidget);
+    expect(find.textContaining('Sources'), findsNothing);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
 
     await tester.tap(find.byTooltip('Clear conversation'));
     await tester.pump();
@@ -79,7 +89,7 @@ void main() {
     await modelManager.dispose();
   });
 
-  testWidgets('custom assistant image and welcome copy are used throughout', (
+  testWidgets('custom assistant image and copy appear only in the welcome', (
     tester,
   ) async {
     final modelManager = LocalModelManager(_ReadyModelRepository());
@@ -117,14 +127,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Welcome!'), findsOneWidget);
     expect(find.text('Koko AI'), findsNothing);
-    expect(
-      tester.widget<AiAvatar>(find.byType(AiAvatar)).assistantName,
-      'Koko AI',
-    );
-    expect(
-      tester.widget<CircleAvatar>(find.byType(CircleAvatar)).foregroundImage,
-      same(logo),
-    );
+    expect(find.byType(AiAvatar), findsNothing);
+    expect(find.byType(CircleAvatar), findsNothing);
     expect(tester.takeException(), isNull);
     await modelManager.dispose();
   });
@@ -231,15 +235,15 @@ void main() {
       find.text('Why can my device not connect to the network?'),
       findsOneWidget,
     );
-    expect(find.text('Thinking…'), findsOneWidget);
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.text('Thinking '), findsOneWidget);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
     firstResponse.add('Check ');
     await tester.pump();
-    expect(find.text('Thinking…'), findsNothing);
+    expect(find.text('Thinking '), findsNothing);
     expect(find.text('Check '), findsOneWidget);
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     expect(find.textContaining('Sources'), findsNothing);
     await tester.pump(const Duration(milliseconds: 250));
     final answerOpacity = find.ancestor(
@@ -269,17 +273,14 @@ void main() {
       find.text('Unable to generate an answer with the local AI model.'),
       findsOneWidget,
     );
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     expect(find.text('Retry'), findsOneWidget);
 
     await tester.tap(find.text('Retry'));
     await tester.pump();
     await tester.pump();
     expect(find.text('Recovered.'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     expect(find.text('Sources · 1'), findsOneWidget);
     expect(attempts, 2);
 
@@ -377,28 +378,25 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Network connection help');
     await tester.tap(find.byTooltip('Send message'));
     await tester.pump();
-    expect(find.text('Thinking…'), findsOneWidget);
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.text('Thinking '), findsOneWidget);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     expect(find.textContaining('References'), findsNothing);
 
     response.add('Check ');
     await tester.pump();
     expect(find.text('Check '), findsOneWidget);
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     expect(find.textContaining('References'), findsNothing);
 
     response.add('Wi-Fi credentials.');
     await tester.pump();
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     expect(find.textContaining('References'), findsNothing);
     await response.close();
     await tester.pump();
     await tester.pump();
     expect(repository.searchCount, 1);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     expect(find.text('References · 2'), findsOneWidget);
     expect(find.text('E123 — Device network connection guide'), findsOneWidget);
     expect(find.text('Network troubleshooting guide'), findsOneWidget);
@@ -436,10 +434,7 @@ void main() {
     await tester.tap(find.byTooltip('Send message'));
     await tester.pumpAndSettle();
     expect(find.text('Hello!'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     expect(find.textContaining('Sources'), findsNothing);
     expect(repository.searchCount, 1);
 
@@ -458,10 +453,7 @@ void main() {
     await tester.tap(find.byTooltip('Send message'));
     await tester.pumpAndSettle();
     expect(find.text('unused'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     expect(find.textContaining('Sources'), findsNothing);
     expect(emptyRepository.searchCount, 1);
     await modelManager.dispose();
@@ -506,7 +498,7 @@ void main() {
       _FakeLlmService(() => Stream.value('Answer.')),
       repository: repository,
     );
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
     );
@@ -515,7 +507,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
         ),
       ),
     );
@@ -560,7 +552,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -583,10 +575,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Check Wi-Fi.'), findsOneWidget);
     expect(find.textContaining('Sources'), findsNothing);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     await modelManager.dispose();
   });
 
@@ -609,7 +598,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Check Wi-Fi.'), findsOneWidget);
     expect(find.text('Sources · 1'), findsOneWidget);
-    expect(find.textContaining('Generated in'), findsNothing);
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
     await modelManager.dispose();
   });
 
@@ -771,10 +760,7 @@ void main() {
     expect(find.text('How can I help?'), findsNothing);
     expect(find.text('Check the connection.'), findsOneWidget);
     expect(find.text('Sources · 1'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     final userText = tester.widget<Text>(find.text('Network connection help'));
     final assistantText = tester.widget<Text>(
       find.text('Check the connection.'),
@@ -830,10 +816,7 @@ void main() {
         tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
         darkTheme.colorScheme.surface,
       );
-      expect(
-        tester.widget<AiAvatar>(find.byType(AiAvatar)).theme.primaryColor,
-        darkTheme.colorScheme.primary,
-      );
+      expect(find.byType(AiAvatar), findsNothing);
       expect(
         tester.widget<Text>(find.text('Dark mode answer.')).style?.color,
         Colors.white,
@@ -842,9 +825,7 @@ void main() {
       expect(find.text('Sources · 1'), findsNothing);
       expect(
         tester
-            .widget<Text>(
-              find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-            )
+            .widget<Text>(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')))
             .style
             ?.color,
         Colors.white.withValues(alpha: .75),
@@ -873,7 +854,7 @@ void main() {
       assistantBubbleColor: Colors.black,
     );
     const answer = 'Hello! How can I help you?';
-    final controller = _MessagesController(
+    final controller = _MessagesCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
       messages: const [
@@ -896,7 +877,7 @@ void main() {
             home: AiChatPage(
               modelManager: modelManager,
               askQuestion: askQuestion,
-              controller: controller,
+              cubit: controller,
               chatTheme: chatTheme,
             ),
           ),
@@ -937,7 +918,7 @@ void main() {
           tester.getTopLeft(find.text('Hello')).dx,
           greaterThan(tester.getTopLeft(find.text(answer)).dx),
         );
-        expect(find.byType(AiAvatar), findsOneWidget);
+        expect(find.byType(AiAvatar), findsNothing);
         expect(find.byTooltip('Copy response'), findsOneWidget);
         expect(find.byTooltip('Regenerate response'), findsOneWidget);
         expect(tester.takeException(), isNull);
@@ -948,7 +929,7 @@ void main() {
     await tester.pump();
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -997,8 +978,8 @@ void main() {
     );
     await tester.tap(find.byTooltip('Send message'));
     await tester.pump();
-    expect(find.text('Thinking…'), findsOneWidget);
-    _expectNoAssistantDecoration(tester, find.text('Thinking…'));
+    expect(find.text('Thinking '), findsOneWidget);
+    _expectNoAssistantDecoration(tester, find.text('Thinking '));
 
     response.add('The device cannot connect.');
     await tester.pump();
@@ -1029,10 +1010,7 @@ void main() {
     );
     expect(find.byTooltip('Copy code'), findsOneWidget);
     expect(find.text('Sources · 1'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     expect(find.byTooltip('Copy response'), findsOneWidget);
     expect(find.byTooltip('Regenerate response'), findsOneWidget);
     await tester.tap(find.byTooltip('Copy response'));
@@ -1163,7 +1141,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Network connection help');
     await tester.tap(find.byTooltip('Send message'));
     await tester.pump();
-    expect(find.text('Thinking…'), findsOneWidget);
+    expect(find.text('Thinking '), findsOneWidget);
     expect(find.byTooltip('Copy response'), findsNothing);
 
     response.add('The device cannot connect.\n\n');
@@ -1183,10 +1161,7 @@ void main() {
     expect(find.text('Network connection help'), findsOneWidget);
     expect(find.text('Sources · 1'), findsOneWidget);
     expect(find.text('Device network connection guide'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
 
     await tester.tap(find.byTooltip('Copy response'));
     await tester.pump();
@@ -1208,7 +1183,7 @@ void main() {
     final askQuestion = _askQuestion(
       _FakeLlmService(() => Stream.value('unused')),
     );
-    final controller = _MessagesController(
+    final controller = _MessagesCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
       messages: const [
@@ -1240,7 +1215,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
         ),
       ),
     );
@@ -1253,7 +1228,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
           configuration: const AiChatConfiguration(showCopyAction: false),
         ),
       ),
@@ -1262,7 +1237,7 @@ void main() {
     expect(find.byTooltip('Copied'), findsNothing);
     expect(find.text('Done'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -1288,7 +1263,7 @@ void main() {
     final askQuestion = _askQuestion(
       _FakeLlmService(() => Stream.value('unused')),
     );
-    final controller = _MessagesController(
+    final controller = _MessagesCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
       messages: const [
@@ -1300,7 +1275,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
         ),
       ),
     );
@@ -1315,7 +1290,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(find.byTooltip('Copy response'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -1333,7 +1308,7 @@ void main() {
     final askQuestion = _askQuestion(
       _FakeLlmService(() => Stream.value('unused')),
     );
-    final controller = _MessagesController(
+    final controller = _MessagesCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
       messages: const [
@@ -1351,7 +1326,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
           chatTheme: const AiChatTheme(primaryColor: Colors.amber),
         ),
       ),
@@ -1364,11 +1339,11 @@ void main() {
       tester.view.physicalSize = size;
       await tester.pump();
       expect(find.byTooltip('Copy response'), findsOneWidget);
-      expect(find.text('Generated in 2.00s'), findsOneWidget);
+      expect(find.text(' 2.00s'), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -1440,11 +1415,11 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text('Previous answer.'), findsNothing);
-      expect(find.text('Thinking…'), findsOneWidget);
+      expect(find.text('Thinking '), findsOneWidget);
       expect(find.byTooltip('Copy response'), findsNothing);
       expect(find.byTooltip('Regenerate response'), findsNothing);
       expect(find.text('Network connection help'), findsOneWidget);
-      expect(find.textContaining('Generated in'), findsNothing);
+      expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNothing);
       expect(find.textContaining('Sources'), findsNothing);
       expect(repository.searchCount, 2);
       expect(generationCount, 2);
@@ -1452,7 +1427,7 @@ void main() {
       updatedResponse.add('Updated ');
       await tester.pump();
       expect(find.text('Updated '), findsOneWidget);
-      expect(find.text('Thinking…'), findsNothing);
+      expect(find.text('Thinking '), findsNothing);
       expect(find.byTooltip('Copy response'), findsNothing);
       updatedResponse.add('answer.\nCheck the connection.');
       await tester.pump();
@@ -1469,10 +1444,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Device network connection guide'), findsNothing);
-      expect(
-        find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-        findsOneWidget,
-      );
+      expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
       expect(find.byTooltip('Regenerate response'), findsOneWidget);
       expect(find.byTooltip('Copy response'), findsOneWidget);
       await tester.tap(find.byTooltip('Copy response'));
@@ -1535,7 +1507,7 @@ void main() {
       author: ChatAuthor.user,
       text: 'Third question',
     );
-    final controller = _MessagesController(
+    final controller = _MessagesCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
       messages: firstTurns,
@@ -1545,7 +1517,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
         ),
       ),
     );
@@ -1637,7 +1609,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
           configuration: const AiChatConfiguration(showRegenerateAction: false),
         ),
       ),
@@ -1645,7 +1617,7 @@ void main() {
     expect(find.byTooltip('Regenerate response'), findsNothing);
     expect(find.byTooltip('Copy response'), findsNWidgets(3));
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -1682,7 +1654,7 @@ void main() {
       await tester.pump();
       expect(find.byTooltip('Regenerate response'), findsNothing);
       expect(find.byTooltip('Copy response'), findsOneWidget);
-      expect(find.text('Thinking…'), findsOneWidget);
+      expect(find.text('Thinking '), findsOneWidget);
       secondResponse.add('Second answer');
       await tester.pump();
       await secondResponse.close();
@@ -1706,10 +1678,7 @@ void main() {
       expect(find.text('Recovered answer'), findsOneWidget);
       expect(find.text('Second answer'), findsNothing);
       expect(find.textContaining('Sources'), findsNothing);
-      expect(
-        find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-        findsNWidgets(2),
-      );
+      expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsNWidgets(2));
       expect(find.byTooltip('Copy response'), findsNWidgets(2));
       expect(find.byTooltip('Regenerate response'), findsOneWidget);
       await modelManager.dispose();
@@ -1731,14 +1700,14 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Show a code example');
     await tester.tap(find.byTooltip('Send message'));
     await tester.pump();
-    expect(find.text('Thinking…'), findsOneWidget);
+    expect(find.text('Thinking '), findsOneWidget);
     const partial = '## Example\n\n```dart\nfinal value =';
     response.add(partial);
     await tester.pump();
     expect(find.text(partial), findsOneWidget);
     expect(find.byTooltip('Copy code'), findsNothing);
     expect(find.byTooltip('Copy response'), findsNothing);
-    expect(find.text('Thinking…'), findsNothing);
+    expect(find.text('Thinking '), findsNothing);
     response.add(' 10;\n```');
     await tester.pump();
     expect(find.byTooltip('Copy code'), findsNothing);
@@ -1749,10 +1718,7 @@ void main() {
     expect(find.byTooltip('Copy code'), findsOneWidget);
     expect(find.byTooltip('Copy response'), findsOneWidget);
     expect(find.byTooltip('Regenerate response'), findsOneWidget);
-    expect(
-      find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-      findsOneWidget,
-    );
+    expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await modelManager.dispose();
   });
@@ -1784,7 +1750,7 @@ void main() {
       );
       const firstAnswer = '## First\n\n```dart\nfinal first = 1;\n```';
       const secondAnswer = '## Second\n\n```json\n{"second": 2}\n```';
-      final controller = _MessagesController(
+      final controller = _MessagesCubit(
         modelManager: modelManager,
         askQuestion: askQuestion,
         messages: const [
@@ -1809,7 +1775,7 @@ void main() {
           home: AiChatPage(
             modelManager: modelManager,
             askQuestion: askQuestion,
-            controller: controller,
+            cubit: controller,
           ),
         ),
       );
@@ -1825,7 +1791,7 @@ void main() {
       expect(find.byTooltip('Regenerate response'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
-      controller.dispose();
+      await tester.runAsync(controller.close);
       await modelManager.dispose();
     },
   );
@@ -1846,7 +1812,7 @@ void main() {
         _FakeLlmService(() => Stream.value('unused')),
       );
       final code = 'final value = "${'x' * 220}";';
-      final controller = _MessagesController(
+      final controller = _MessagesCubit(
         modelManager: modelManager,
         askQuestion: askQuestion,
         messages: [
@@ -1868,7 +1834,7 @@ void main() {
           home: AiChatPage(
             modelManager: modelManager,
             askQuestion: askQuestion,
-            controller: controller,
+            cubit: controller,
           ),
         ),
       );
@@ -1894,7 +1860,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(tester.getBottomRight(find.byType(TextField)).dy, lessThan(430));
       await tester.pumpWidget(const SizedBox.shrink());
-      controller.dispose();
+      await tester.runAsync(controller.close);
       await modelManager.dispose();
     },
   );
@@ -1907,7 +1873,7 @@ void main() {
     final askQuestion = _askQuestion(
       _FakeLlmService(() => Stream.value('unused')),
     );
-    final controller = _MessagesController(
+    final controller = _MessagesCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
       messages: const [
@@ -1940,7 +1906,7 @@ void main() {
       home: AiChatPage(
         modelManager: modelManager,
         askQuestion: askQuestion,
-        controller: controller,
+        cubit: controller,
         configuration: AiChatConfiguration(showRetryAction: allowRetry),
       ),
     );
@@ -1967,7 +1933,7 @@ void main() {
     expect(find.byTooltip('Regenerate response'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -2035,7 +2001,7 @@ void main() {
       retryButton.onPressed!();
       await tester.pump();
       await tester.pump();
-      expect(find.text('Thinking…'), findsOneWidget);
+      expect(find.text('Thinking '), findsOneWidget);
       expect(find.text('Retry'), findsNothing);
       expect(
         tester
@@ -2049,7 +2015,7 @@ void main() {
         isNull,
       );
       expect(find.text(question), findsOneWidget);
-      expect(find.byType(AiAvatar), findsOneWidget);
+      expect(find.byType(AiAvatar), findsNothing);
       expect(repository.attempts, 2);
       secondSearch.complete();
       await tester.pumpAndSettle();
@@ -2061,12 +2027,9 @@ void main() {
       expect(find.byTooltip('Regenerate response'), findsOneWidget);
       expect(find.text('Sources · 1'), findsOneWidget);
       expect(find.text('Device network connection guide'), findsOneWidget);
-      expect(
-        find.textContaining(RegExp(r'^Generated in \d+\.\d{2}s$')),
-        findsOneWidget,
-      );
+      expect(find.textContaining(RegExp(r'^ \d+\.\d{2}s$')), findsOneWidget);
       expect(find.text(question), findsOneWidget);
-      expect(find.byType(AiAvatar), findsOneWidget);
+      expect(find.byType(AiAvatar), findsNothing);
       expect(repository.attempts, 2);
       expect(generationCount, 1);
       await tester.tap(find.byTooltip('Copy response'));
@@ -2125,7 +2088,7 @@ void main() {
     expect(find.byTooltip('Copy response'), findsNothing);
     expect(find.byTooltip('Regenerate response'), findsNothing);
     expect(find.text('Original question'), findsOneWidget);
-    expect(find.byType(AiAvatar), findsOneWidget);
+    expect(find.byType(AiAvatar), findsNothing);
 
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
@@ -2134,7 +2097,7 @@ void main() {
     expect(find.byTooltip('Copy response'), findsOneWidget);
     expect(find.byTooltip('Regenerate response'), findsOneWidget);
     expect(find.text('Original question'), findsOneWidget);
-    expect(find.byType(AiAvatar), findsOneWidget);
+    expect(find.byType(AiAvatar), findsNothing);
     expect(attempts, 3);
     expect(tester.takeException(), isNull);
     await modelManager.dispose();
@@ -2343,7 +2306,7 @@ void main() {
     expect(configuration.showModelLabel, isTrue);
     expect(configuration.showRuntimeBackend, isTrue);
     expect(configuration.showGenerationTime, isTrue);
-    expect(configuration.generationTimeLabel, 'Generated in');
+    expect(configuration.generationTimeLabel, '');
     expect(configuration.scrollThreshold, 160);
     expect(configuration.assistantName, 'ViGuide AI');
     expect(configuration.assistantAvatar, isNull);
@@ -2368,7 +2331,7 @@ void main() {
       isFalse,
     );
     expect(theme.avatarLabel, 'AI');
-    expect(theme.primaryColor, const Color(0xFF3F51B5));
+    expect(theme.primaryColor, const Color(0xFFCC2C08));
     expect(theme.assistantBubbleColor, const Color(0xFFF1F3F8));
     expect(theme.userBubbleColor, theme.primaryColor);
     expect(theme.userTextColor, Colors.white);
@@ -2411,22 +2374,18 @@ void _expectNoAssistantDecoration(WidgetTester tester, Finder content) {
   expect(decoratedAncestors, isEmpty);
 }
 
-class _MessagesController extends ChatController {
-  _MessagesController({
+class _MessagesCubit extends ChatCubit {
+  _MessagesCubit({
     required super.modelManager,
     required super.askQuestion,
-    required this.messages,
-  });
-
-  List<ChatMessage> messages;
-
-  void setMessages(List<ChatMessage> value) {
-    messages = value;
-    notifyListeners();
+    required List<ChatMessage> messages,
+  }) {
+    setMessages(messages);
   }
 
-  @override
-  ChatState get state => super.state.copyWith(messages: messages);
+  void setMessages(List<ChatMessage> value) {
+    emit(state.copyWith(messages: value));
+  }
 }
 
 AskQuestionUseCase _askQuestion(

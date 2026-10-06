@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_page.dart';
-import 'package:slm_ai_chatbot/features/chat/presentation/chat_controller.dart';
-import 'package:slm_ai_chatbot/features/chat/presentation/chat_models.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_state.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/models/chat_message.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';
@@ -17,12 +19,290 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
+  test(
+    'emits every state in order while state changes synchronously',
+    () async {
+      final modelManager = LocalModelManager(_ReadyModelRepository());
+      await modelManager.ensureReady();
+      final response = StreamController<String>();
+      final cubit = ChatCubit(
+        modelManager: modelManager,
+        askQuestion: AskQuestionUseCase(
+          ragRepository: _RagRepository(),
+          llmService: _LlmService(response.stream),
+        ),
+      );
+      final states = <ChatState>[];
+      final subscription = cubit.stream.listen(states.add);
+
+      final sending = cubit.send('  Need help  ');
+      expect(cubit.state.messages.first.text, 'Need help');
+      expect(cubit.state.isTyping, isTrue);
+      expect(cubit.state.canSend, isFalse);
+      expect(states, isEmpty);
+      await cubit.send('Blocked second send');
+      cubit.clearHistory();
+      expect(cubit.state.messages, hasLength(2));
+
+      response.add('Part');
+      await Future<void>.delayed(Duration.zero);
+      response.add('');
+      await Future<void>.delayed(Duration.zero);
+      response.add(' two');
+      await Future<void>.delayed(Duration.zero);
+      await response.close();
+      await sending;
+      await Future<void>.delayed(Duration.zero);
+
+      expect(states.map((state) => state.messages.last.text), [
+        '',
+        'Part',
+        'Part',
+        'Part two',
+        'Part two',
+        'Part two',
+      ]);
+      expect(states.map((state) => state.isTyping), [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+      ]);
+      expect(states.map((state) => state.messages.last.isStreaming), [
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+      ]);
+      expect(identical(states[1], states[2]), isFalse);
+      expect(
+        states.take(4).every((state) => state.messages.last.sources.isEmpty),
+        isTrue,
+      );
+      expect(states[4].messages.last.sources, hasLength(1));
+      expect(states[4].messages.last.generationDuration, isNotNull);
+      expect(states.last.canSend, isTrue);
+
+      cubit.clearHistory();
+      expect(cubit.state.messages, isEmpty);
+      await Future<void>.delayed(Duration.zero);
+      expect(states.last.messages, isEmpty);
+      await subscription.cancel();
+      await cubit.close();
+      await modelManager.dispose();
+    },
+  );
+
+  test(
+    'close cancels once and ignores late generation and new actions',
+    () async {
+      final modelManager = LocalModelManager(_ReadyModelRepository());
+      await modelManager.ensureReady();
+      final response = StreamController<String>();
+      final llm = _LlmService(response.stream);
+      final cubit = ChatCubit(
+        modelManager: modelManager,
+        askQuestion: AskQuestionUseCase(
+          ragRepository: _RagRepository(),
+          llmService: llm,
+        ),
+      );
+      final states = <ChatState>[];
+      var streamDone = false;
+      final subscription = cubit.stream.listen(
+        states.add,
+        onDone: () => streamDone = true,
+      );
+      final sending = cubit.send('Need help');
+      response.add('First text');
+      await Future<void>.delayed(Duration.zero);
+      final lastState = cubit.state;
+      final assistantId = lastState.messages.last.id;
+      expect(cubit.isFirstRenderedTextPending(assistantId), isTrue);
+
+      final closing = cubit.close();
+      expect(cubit.isClosed, isTrue);
+      expect(cubit.close(), same(closing));
+      expect(llm.stopCalls, 1);
+      expect(cubit.isFirstRenderedTextPending(assistantId), isFalse);
+      await cubit.send('Late question');
+      cubit.clearHistory();
+      expect(() => cubit.retry(lastState.messages.last), throwsStateError);
+      expect(() => cubit.regenerate(lastState.messages.last), throwsStateError);
+      expect(() => cubit.retryModelInitialization(), throwsStateError);
+      response.add('Late text');
+      await sending;
+      await response.close();
+      await closing;
+      await modelManager.ensureReady();
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state, same(lastState));
+      expect(states.last, same(lastState));
+      expect(streamDone, isTrue);
+      expect(llm.generateCalls, 1);
+      await subscription.cancel();
+      await modelManager.dispose();
+    },
+  );
+
+  test('late retrieval results cannot emit after close', () async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final repository = _DelayedRagRepository();
+    final llm = _LlmService(Stream.value('Late answer'));
+    final cubit = ChatCubit(
+      modelManager: modelManager,
+      askQuestion: AskQuestionUseCase(
+        ragRepository: repository,
+        llmService: llm,
+      ),
+    );
+    final sending = cubit.send('Need help');
+    await Future<void>.delayed(Duration.zero);
+    final state = cubit.state;
+    expect(state.isTyping, isTrue);
+    await cubit.close();
+    expect(llm.stopCalls, 1);
+    repository.result.complete(const []);
+    await sending;
+    expect(cubit.state, same(state));
+    expect(cubit.state.messages.last.text, isEmpty);
+    await modelManager.dispose();
+  });
+
+  test('late knowledge success or failure cannot emit after close', () async {
+    for (final fail in [false, true]) {
+      final modelManager = LocalModelManager(_ReadyModelRepository());
+      await modelManager.ensureReady();
+      final knowledge = Completer<void>();
+      final cubit = ChatCubit(
+        modelManager: modelManager,
+        askQuestion: AskQuestionUseCase(
+          ragRepository: _RagRepository(),
+          llmService: _LlmService(Stream.value('unused')),
+        ),
+        prepareKnowledgeBase: () => knowledge.future,
+      );
+      final state = cubit.state;
+      expect(state.isPreparingKnowledge, isTrue);
+      final closing = cubit.close();
+      if (fail) {
+        knowledge.completeError(StateError('Late preparation failure'));
+      } else {
+        knowledge.complete();
+      }
+      await closing;
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state, same(state));
+      await modelManager.dispose();
+    }
+  });
+
+  test('late model readiness cannot start knowledge after close', () async {
+    final repository = _StagedModelRepository();
+    final modelManager = LocalModelManager(repository);
+    var preparationCalls = 0;
+    final cubit = ChatCubit(
+      modelManager: modelManager,
+      askQuestion: AskQuestionUseCase(
+        ragRepository: _RagRepository(),
+        llmService: _LlmService(Stream.value('unused')),
+      ),
+      prepareKnowledgeBase: () async {
+        preparationCalls++;
+      },
+    );
+    await Future<void>.delayed(Duration.zero);
+    final state = cubit.state;
+    await cubit.close();
+    repository.finishDownload.complete();
+    repository.finishLoading.complete();
+    await modelManager.ensureReady();
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state, same(state));
+    expect(preparationCalls, 0);
+    await modelManager.dispose();
+  });
+
+  testWidgets('page adopts but never closes an injected cubit', (tester) async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final llm = _LlmService(Stream.value('Answer'));
+    final askQuestion = AskQuestionUseCase(
+      ragRepository: _RagRepository(),
+      llmService: llm,
+    );
+    final cubit = ChatCubit(
+      modelManager: modelManager,
+      askQuestion: askQuestion,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiChatPage(
+          modelManager: modelManager,
+          askQuestion: askQuestion,
+          cubit: cubit,
+        ),
+      ),
+    );
+    await tester.pumpWidget(const SizedBox());
+    expect(cubit.isClosed, isFalse);
+    expect(llm.stopCalls, 0);
+    final sending = cubit.send('Need help');
+    await tester.pump();
+    await sending;
+    expect(cubit.state.messages.last.text, 'Answer');
+    await tester.runAsync(cubit.close);
+    expect(llm.stopCalls, 1);
+    await modelManager.dispose();
+  });
+
+  testWidgets('page closes its own cubit and ignores late knowledge', (
+    tester,
+  ) async {
+    final modelManager = LocalModelManager(_ReadyModelRepository());
+    await modelManager.ensureReady();
+    final knowledge = Completer<void>();
+    final llm = _LlmService(Stream.value('unused'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AiChatPage(
+          modelManager: modelManager,
+          askQuestion: AskQuestionUseCase(
+            ragRepository: _RagRepository(),
+            llmService: llm,
+          ),
+          prepareKnowledgeBase: () => knowledge.future,
+        ),
+      ),
+    );
+    final cubit = tester
+        .widget<BlocConsumer<ChatCubit, ChatState>>(
+          find.byType(BlocConsumer<ChatCubit, ChatState>),
+        )
+        .bloc!;
+    await tester.pumpWidget(const SizedBox());
+    expect(cubit.isClosed, isTrue);
+    expect(llm.stopCalls, 1);
+    final state = cubit.state;
+    knowledge.complete();
+    await tester.pump();
+    expect(cubit.state, same(state));
+    expect(tester.takeException(), isNull);
+    await tester.runAsync(cubit.close);
+    await modelManager.dispose();
+  });
+
   test('prepares knowledge only after the model finishes loading', () async {
     final repository = _StagedModelRepository();
     final modelManager = LocalModelManager(repository);
     final knowledgePrepared = Completer<void>();
     var preparationCalls = 0;
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -33,6 +313,8 @@ void main() {
         return knowledgePrepared.future;
       },
     );
+    final states = <ChatState>[];
+    final subscription = controller.stream.listen(states.add);
 
     await Future<void>.delayed(Duration.zero);
     expect(modelManager.state.status, ModelStatus.downloading);
@@ -58,8 +340,28 @@ void main() {
     expect(controller.state.knowledgeReady, isTrue);
     expect(controller.state.isPreparingKnowledge, isFalse);
     expect(controller.state.canSend, isTrue);
+    expect(states.map((state) => state.modelState.status), [
+      ModelStatus.notDownloaded,
+      ModelStatus.downloading,
+      ModelStatus.downloaded,
+      ModelStatus.loading,
+      ModelStatus.ready,
+      ModelStatus.ready,
+      ModelStatus.ready,
+    ]);
+    expect(states.map((state) => state.isPreparingKnowledge), [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
+    expect(states.take(6).every((state) => !state.canSend), isTrue);
 
-    controller.dispose();
+    await subscription.cancel();
+    await controller.close();
     await modelManager.dispose();
   });
 
@@ -69,7 +371,7 @@ void main() {
       final repository = _StagedModelRepository(failFirstDownload: true);
       final modelManager = LocalModelManager(repository);
       var preparationCalls = 0;
-      final controller = ChatController(
+      final controller = ChatCubit(
         modelManager: modelManager,
         askQuestion: AskQuestionUseCase(
           ragRepository: _RagRepository(),
@@ -99,7 +401,7 @@ void main() {
       expect(controller.state.knowledgeReady, isTrue);
       expect(preparationCalls, 1);
 
-      controller.dispose();
+      await controller.close();
       await modelManager.dispose();
     },
   );
@@ -108,7 +410,7 @@ void main() {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
     var preparationCalls = 0;
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -125,7 +427,7 @@ void main() {
     await modelManager.ensureReady();
     expect(preparationCalls, 1);
 
-    controller.dispose();
+    await controller.close();
     await modelManager.dispose();
   });
 
@@ -177,7 +479,7 @@ void main() {
       ragRepository: _RagRepository(),
       llmService: _LlmService(response.stream),
     );
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: askQuestion,
     );
@@ -186,7 +488,7 @@ void main() {
         home: AiChatPage(
           modelManager: modelManager,
           askQuestion: askQuestion,
-          controller: controller,
+          cubit: controller,
         ),
       ),
     );
@@ -202,7 +504,7 @@ void main() {
     await response.close();
     await sending;
     await tester.pumpWidget(const SizedBox());
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -212,7 +514,7 @@ void main() {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
     final response = StreamController<String>();
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -234,7 +536,7 @@ void main() {
     expect(controller.isFirstRenderedTextPending(messageId), isFalse);
     await response.close();
     await sending;
-    controller.dispose();
+    await tester.runAsync(controller.close);
     await modelManager.dispose();
   });
 
@@ -242,7 +544,7 @@ void main() {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
     final response = StreamController<String>();
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -274,7 +576,7 @@ void main() {
     );
 
     await response.close();
-    controller.dispose();
+    await controller.close();
     await modelManager.dispose();
   });
 
@@ -282,7 +584,7 @@ void main() {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
     final response = StreamController<String>();
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -308,7 +610,7 @@ void main() {
     expect(controller.state.messages.last.generationDuration, isNotNull);
     expect(controller.state.messages.first.generationDuration, isNull);
 
-    controller.dispose();
+    await controller.close();
     await modelManager.dispose();
   });
 
@@ -316,7 +618,7 @@ void main() {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
     final secondResponse = StreamController<String>();
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -346,7 +648,7 @@ void main() {
     );
     expect(controller.state.messages[2].generationDuration, isNull);
 
-    controller.dispose();
+    await controller.close();
     await modelManager.dispose();
   });
 
@@ -354,7 +656,7 @@ void main() {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
     final history = InMemoryConversationHistory();
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -371,7 +673,7 @@ void main() {
     expect(controller.state.messages, isEmpty);
     expect(history.messages, isEmpty);
 
-    controller.dispose();
+    await controller.close();
     await modelManager.dispose();
   });
 
@@ -382,7 +684,7 @@ void main() {
       await modelManager.ensureReady();
       final history = InMemoryConversationHistory();
       final secondResponse = StreamController<String>();
-      final controller = ChatController(
+      final controller = ChatCubit(
         modelManager: modelManager,
         askQuestion: AskQuestionUseCase(
           ragRepository: _RagRepository(),
@@ -434,7 +736,7 @@ void main() {
         'Need help',
         'New answer',
       ]);
-      controller.dispose();
+      await controller.close();
       await modelManager.dispose();
     },
   );
@@ -446,7 +748,7 @@ void main() {
       await modelManager.ensureReady();
       final history = InMemoryConversationHistory();
       final failedResponse = StreamController<String>();
-      final controller = ChatController(
+      final controller = ChatCubit(
         modelManager: modelManager,
         askQuestion: AskQuestionUseCase(
           ragRepository: _RagRepository(),
@@ -482,7 +784,7 @@ void main() {
         'Recovered answer',
       ]);
       await failedResponse.close();
-      controller.dispose();
+      await controller.close();
       await modelManager.dispose();
     },
   );
@@ -494,7 +796,7 @@ void main() {
       await modelManager.ensureReady();
       final history = InMemoryConversationHistory();
       final failedRetry = StreamController<String>();
-      final controller = ChatController(
+      final controller = ChatCubit(
         modelManager: modelManager,
         askQuestion: AskQuestionUseCase(
           ragRepository: _RagRepository(),
@@ -566,7 +868,7 @@ void main() {
         throwsStateError,
       );
       await failedRetry.close();
-      controller.dispose();
+      await controller.close();
       await modelManager.dispose();
     },
   );
@@ -574,7 +876,7 @@ void main() {
   test('retry rejects errors without a matching original question', () async {
     final modelManager = LocalModelManager(_ReadyModelRepository());
     await modelManager.ensureReady();
-    final controller = ChatController(
+    final controller = ChatCubit(
       modelManager: modelManager,
       askQuestion: AskQuestionUseCase(
         ragRepository: _RagRepository(),
@@ -597,7 +899,7 @@ void main() {
       () => controller.retry(controller.state.messages.last),
       throwsStateError,
     );
-    controller.dispose();
+    await controller.close();
     await modelManager.dispose();
   });
 }
@@ -643,15 +945,22 @@ class _LlmService implements LocalLlmService {
   _LlmService(this.response);
 
   final Stream<String> response;
+  var stopCalls = 0;
+  var generateCalls = 0;
 
   @override
   Future<void> dispose() async {}
 
   @override
-  Stream<String> generate(String prompt) => response;
+  Stream<String> generate(String prompt) {
+    generateCalls++;
+    return response;
+  }
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async {
+    stopCalls++;
+  }
 }
 
 class _QueuedLlmService implements LocalLlmService {
@@ -696,4 +1005,16 @@ class _RagRepository implements RagRepository {
       ),
     ];
   }
+}
+
+class _DelayedRagRepository extends _RagRepository {
+  final result = Completer<List<RagSearchResult>>();
+
+  @override
+  Future<List<RagSearchResult>> search({
+    required String query,
+    String? exactMatchQuery,
+    int topK = 1,
+    double threshold = 0,
+  }) => result.future;
 }

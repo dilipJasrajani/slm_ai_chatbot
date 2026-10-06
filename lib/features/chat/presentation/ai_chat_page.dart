@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show MatrixUtils, RenderAbstractViewport;
@@ -10,8 +13,9 @@ import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 import 'package:slm_ai_chatbot/features/rag/evaluation/domain/retrieval_evaluation_runner.dart';
 
 import 'ai_chat_configuration.dart';
-import 'chat_controller.dart';
-import 'chat_models.dart';
+import 'cubit/chat_cubit.dart';
+import 'cubit/chat_state.dart';
+import 'models/chat_message.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/chat_message_bubble.dart';
 import 'widgets/chat_status_banners.dart';
@@ -19,14 +23,14 @@ import 'widgets/chat_welcome.dart';
 
 export 'widgets/ai_avatar.dart';
 
-/// Renders the chat experience and forwards user actions to [ChatController].
+/// Renders the chat experience and forwards user actions to [ChatCubit].
 class AiChatPage extends StatefulWidget {
   const AiChatPage({
     required this.modelManager,
     required this.askQuestion,
     this.configuration = const AiChatConfiguration(),
     this.chatTheme = const AiChatTheme(),
-    this.controller,
+    this.cubit,
     this.chatIntentEvaluationRunner,
     this.prepareKnowledgeBase,
     this.retrievalEvaluationRunner,
@@ -38,7 +42,7 @@ class AiChatPage extends StatefulWidget {
   final AskQuestionUseCase askQuestion;
   final AiChatConfiguration configuration;
   final AiChatTheme chatTheme;
-  final ChatController? controller;
+  final ChatCubit? cubit;
   final ChatIntentEvaluationRunner? chatIntentEvaluationRunner;
   final Future<void> Function()? prepareKnowledgeBase;
   final RetrievalEvaluationRunner? retrievalEvaluationRunner;
@@ -50,8 +54,8 @@ class AiChatPage extends StatefulWidget {
 }
 
 class _AiChatPageState extends State<AiChatPage> {
-  late final ChatController _controller;
-  late final bool _ownsController;
+  late final ChatCubit _cubit;
+  late final bool _ownsCubit;
   final _composerController = TextEditingController();
   final _scrollController = ScrollController();
   final _messageWidgets = <String, ChatMessageBubble>{};
@@ -79,18 +83,17 @@ class _AiChatPageState extends State<AiChatPage> {
   }
 
   @override
-  /// Creates or adopts the chat controller, then observes state and scrolling.
+  /// Creates or adopts the chat cubit, then observes scrolling.
   void initState() {
     super.initState();
-    _ownsController = widget.controller == null;
-    _controller =
-        widget.controller ??
-        ChatController(
+    _ownsCubit = widget.cubit == null;
+    _cubit =
+        widget.cubit ??
+        ChatCubit(
           modelManager: widget.modelManager,
           askQuestion: widget.askQuestion,
           prepareKnowledgeBase: widget.prepareKnowledgeBase,
         );
-    _controller.addListener(_onStateChanged);
     _scrollController.addListener(_onScroll);
   }
 
@@ -98,8 +101,7 @@ class _AiChatPageState extends State<AiChatPage> {
   /// Releases page-owned controllers and stops observing transient UI state.
   void dispose() {
     _pendingVisibleItems.clear();
-    _controller.removeListener(_onStateChanged);
-    if (_ownsController) _controller.dispose();
+    if (_ownsCubit) unawaited(_cubit.close());
     _composerController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -118,15 +120,14 @@ class _AiChatPageState extends State<AiChatPage> {
     _bottomInset = bottomInset;
   }
 
-  /// Rebuilds for controller updates and resets transient message state on clear.
-  void _onStateChanged() {
+  /// Resets transient message state on clear and scrolls after state updates.
+  void _onStateChanged(ChatState state) {
     if (!mounted) return;
-    if (_controller.state.messages.isEmpty) {
+    if (state.messages.isEmpty) {
       _messageWidgets.clear();
       _seenMessages.clear();
       _pendingVisibleItems.clear();
     }
-    setState(() {});
     _scheduleScroll();
   }
 
@@ -158,7 +159,7 @@ class _AiChatPageState extends State<AiChatPage> {
       }
       final previousOffset = _scrollController.position.pixels;
       final target = _scrollController.position.maxScrollExtent;
-      if (_controller.state.isTyping ||
+      if (_cubit.state.isTyping ||
           MediaQuery.disableAnimationsOf(context) ||
           _theme.animationDuration == Duration.zero) {
         _scrollController.jumpTo(target);
@@ -225,10 +226,7 @@ class _AiChatPageState extends State<AiChatPage> {
       Offset.zero & content.size,
     );
     if (!(Offset.zero & viewport.size).overlaps(contentBounds)) return;
-    _controller.recordFirstRenderedText(
-      messageId,
-      requestNumber: requestNumber,
-    );
+    _cubit.recordFirstRenderedText(messageId, requestNumber: requestNumber);
     _pendingVisibleItems.remove(messageId);
   }
 
@@ -238,7 +236,7 @@ class _AiChatPageState extends State<AiChatPage> {
     int requestNumber,
     BuildContext contentContext,
   ) {
-    if (_controller.pendingRenderedRequestNumber(messageId) != requestNumber) {
+    if (_cubit.pendingRenderedRequestNumber(messageId) != requestNumber) {
       return;
     }
     _pendingVisibleItems[messageId] = (
@@ -258,13 +256,12 @@ class _AiChatPageState extends State<AiChatPage> {
 
   /// Returns a cached message widget or creates one with current display options.
   Widget _messageAt(ChatMessage message, {required bool isLatestAssistant}) {
-    final pendingRequestNumber = _controller.pendingRenderedRequestNumber(
+    final pendingRequestNumber = _cubit.pendingRenderedRequestNumber(
       message.id,
     );
     final showRegenerateAction =
         widget.configuration.showRegenerateAction && isLatestAssistant;
-    final interactionEnabled =
-        _controller.state.canSend && !_isRunningEvaluation;
+    final interactionEnabled = _cubit.state.canSend && !_isRunningEvaluation;
     final existing = _messageWidgets[message.id];
     if (existing != null &&
         identical(existing.message, message) &&
@@ -319,24 +316,22 @@ class _AiChatPageState extends State<AiChatPage> {
   /// Sends the current composer text when chat input is currently available.
   void _send() {
     final text = _composerController.text;
-    if (_isRunningEvaluation ||
-        !_controller.state.canSend ||
-        text.trim().isEmpty) {
+    if (_isRunningEvaluation || !_cubit.state.canSend || text.trim().isEmpty) {
       return;
     }
     _composerController.clear();
-    _controller.send(text);
+    _cubit.send(text);
   }
 
   /// Restarts a failed assistant response when chat input is currently available.
   void _retry(ChatMessage message) {
-    if (!_controller.state.canSend || _isRunningEvaluation) return;
-    _controller.retry(message);
+    if (!_cubit.state.canSend || _isRunningEvaluation) return;
+    _cubit.retry(message);
   }
 
   /// Regenerates an assistant response and surfaces any restoration error.
   Future<void> _regenerate(ChatMessage message) async {
-    final error = await _controller.regenerate(message);
+    final error = await _cubit.regenerate(message);
     if (mounted && error != null) {
       ScaffoldMessenger.of(
         context,
@@ -347,7 +342,16 @@ class _AiChatPageState extends State<AiChatPage> {
   @override
   /// Composes the app bar, status banners, conversation content, and composer.
   Widget build(BuildContext context) {
-    final state = _controller.state;
+    return BlocConsumer<ChatCubit, ChatState>(
+      bloc: _cubit,
+      listener: (context, state) => _onStateChanged(state),
+      builder: (context, state) => _buildChat(context),
+    );
+  }
+
+  Widget _buildChat(BuildContext context) {
+    // Parent rebuilds must also see state emitted before stream delivery.
+    final state = _cubit.state;
     final chatTheme = _theme;
     final hostTheme = Theme.of(context);
     final interactionEnabled = state.canSend && !_isRunningEvaluation;
@@ -370,7 +374,7 @@ class _AiChatPageState extends State<AiChatPage> {
               tooltip: 'Clear conversation',
               onPressed: state.messages.isEmpty || state.isTyping
                   ? null
-                  : _controller.clearHistory,
+                  : _cubit.clearHistory,
               icon: const Icon(Icons.delete_outline),
             ),
             if (kDebugMode && widget.chatIntentEvaluationRunner != null)
@@ -404,7 +408,7 @@ class _AiChatPageState extends State<AiChatPage> {
                 state: state.modelState,
                 theme: chatTheme,
                 showRetryAction: widget.configuration.showRetryAction,
-                onRetry: _controller.retryModelInitialization,
+                onRetry: _cubit.retryModelInitialization,
               ),
               if (state.isPreparingKnowledge || state.knowledgeError != null)
                 KnowledgeStatusBanner(state: state, theme: chatTheme),
@@ -469,7 +473,7 @@ class _AiChatPageState extends State<AiChatPage> {
   /// Runs debug-only CHAT-versus-KNOWLEDGE routing evaluation and shows its summary.
   Future<void> _runRoutingEvaluation() async {
     final runner = widget.chatIntentEvaluationRunner;
-    if (runner == null || _isRunningEvaluation || _controller.state.isTyping) {
+    if (runner == null || _isRunningEvaluation || _cubit.state.isTyping) {
       return;
     }
     setState(() => _isRunningEvaluation = true);
@@ -494,7 +498,7 @@ class _AiChatPageState extends State<AiChatPage> {
   /// Runs debug-only retrieval evaluation and shows its result summary.
   Future<void> _runEvaluation() async {
     final runner = widget.retrievalEvaluationRunner;
-    if (runner == null || _isRunningEvaluation || _controller.state.isTyping) {
+    if (runner == null || _isRunningEvaluation || _cubit.state.isTyping) {
       return;
     }
     setState(() => _isRunningEvaluation = true);

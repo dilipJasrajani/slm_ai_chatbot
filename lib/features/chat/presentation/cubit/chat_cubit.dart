@@ -2,26 +2,30 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/model_status.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
-import 'chat_models.dart';
+import '../models/chat_message.dart';
+import 'chat_state.dart';
 
 /// Converts chat UI events and use-case streams into immutable presentation state.
-class ChatController extends ChangeNotifier {
-  ChatController({
+class ChatCubit extends Cubit<ChatState> {
+  ChatCubit({
     required LocalModelManager modelManager,
     required AskQuestionUseCase askQuestion,
     Future<void> Function()? prepareKnowledgeBase,
   }) : _modelManager = modelManager,
        _askQuestion = askQuestion,
        _prepareKnowledgeBase = prepareKnowledgeBase,
-       _state = ChatState(
-         modelState: modelManager.state,
-         knowledgeReady: prepareKnowledgeBase == null,
+       super(
+         ChatState(
+           modelState: modelManager.state,
+           knowledgeReady: prepareKnowledgeBase == null,
+         ),
        ) {
     _modelSubscription = _modelManager.states.listen(_onModelState);
     if (_modelManager.state.status == ModelStatus.ready) {
@@ -35,14 +39,12 @@ class ChatController extends ChangeNotifier {
   final AskQuestionUseCase _askQuestion;
   final Future<void> Function()? _prepareKnowledgeBase;
   late final StreamSubscription<ModelState> _modelSubscription;
-  ChatState _state;
   var _messageSequence = 0;
   var _requestSequence = 0;
   final _pendingRenderedProfiles = <String, AiLatencyProfile>{};
   var _disposed = false;
   var _knowledgePreparationStarted = false;
-
-  ChatState get state => _state;
+  Future<void>? _closeFuture;
 
   void _startKnowledgePreparation() {
     if (_disposed ||
@@ -102,14 +104,15 @@ class ChatController extends ChangeNotifier {
 
   Future<void> send(String value) async {
     final question = value.trim();
-    if (question.isEmpty || !state.canSend) return;
+    if (_disposed || question.isEmpty || !state.canSend) return;
     await _runQuestion(question);
   }
 
   Future<String?> regenerate(ChatMessage message) {
     final index = state.messages.indexWhere((item) => item.id == message.id);
     final current = index < 0 ? null : state.messages[index];
-    if (!state.canSend ||
+    if (_disposed ||
+        !state.canSend ||
         current == null ||
         current.author != ChatAuthor.assistant ||
         current.isStreaming ||
@@ -261,7 +264,8 @@ class ChatController extends ChangeNotifier {
   Future<void> retry(ChatMessage message) {
     final index = state.messages.indexWhere((item) => item.id == message.id);
     final current = index < 0 ? null : state.messages[index];
-    if (!state.canSend ||
+    if (_disposed ||
+        !state.canSend ||
         current == null ||
         current.author != ChatAuthor.assistant ||
         !current.isError ||
@@ -275,7 +279,7 @@ class ChatController extends ChangeNotifier {
   }
 
   void clearHistory() {
-    if (state.isTyping) return;
+    if (_disposed || state.isTyping) return;
     _askQuestion.clearHistory();
     _pendingRenderedProfiles.clear();
     _setState(state.copyWith(messages: const []));
@@ -337,16 +341,19 @@ class ChatController extends ChangeNotifier {
 
   void _setState(ChatState nextState) {
     if (_disposed) return;
-    _state = nextState;
-    notifyListeners();
+    emit(nextState);
   }
 
   @override
-  void dispose() {
+  Future<void> close() {
+    if (_closeFuture != null) return _closeFuture!;
+    // Guard synchronously: page disposal cannot await asynchronous cleanup.
     _disposed = true;
     _pendingRenderedProfiles.clear();
-    unawaited(_modelSubscription.cancel());
-    unawaited(_askQuestion.cancel());
-    super.dispose();
+    return _closeFuture = Future.wait([
+      _modelSubscription.cancel(),
+      _askQuestion.cancel(),
+      super.close(),
+    ]).then((_) {});
   }
 }

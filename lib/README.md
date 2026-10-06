@@ -22,8 +22,8 @@ feature dependencies, and starts the Flutter app.
 
 ## Chat request flow
 
-1. `AiChatPage` reads the user's message and sends it to `ChatController`.
-2. `ChatController` adds user and streaming assistant messages to the UI, then
+1. `AiChatPage` reads the user's message and sends it to `ChatCubit`.
+2. `ChatCubit` adds user and streaming assistant messages to the UI, then
    consumes `AskQuestionUseCase.stream`.
 3. `AskQuestionUseCase` reads short-term conversation history, builds a
    history-aware retrieval query, searches the local RAG database, and checks
@@ -34,7 +34,7 @@ feature dependencies, and starts the Flutter app.
    return a controlled response without generation.
 5. Successful completed answers are stored with the user message in
    short-term conversation history.
-6. Each streamed answer is returned to `ChatController`, which updates the
+6. Each streamed answer is returned to `ChatCubit`, which updates the
    assistant message displayed by `AiChatPage`.
 
 ## AI request flow
@@ -42,7 +42,7 @@ feature dependencies, and starts the Flutter app.
 ```text
 User
  ↓
-ChatController
+ChatCubit
  ↓
 AskQuestionUseCase
  ↓
@@ -61,7 +61,7 @@ LocalLlmService
 Selected local model
 ```
 
-`ChatController` turns the UI event and streamed answer into presentation
+`ChatCubit` turns the UI event and streamed answer into presentation
 state. `AskQuestionUseCase` retrieves and grounds first, then makes one
 generation call through the generic local LLM service if retrieval succeeds.
 A successful completed answer is added to short-term conversation history
@@ -198,7 +198,7 @@ MyApp
     ↓
 AiChatPage
     ↓
-ChatController
+ChatCubit
     ↓
 AskQuestionUseCase
     ↓
@@ -211,17 +211,29 @@ is the application shell, and `app/app_dependencies.dart` is the composition
 root that wires shared runtime instances and interfaces to implementations.
 
 Change chat UI, interaction, scrolling, animations, and message rendering in
-`features/chat/presentation/ai_chat_page.dart`. `ChatController` in the same
-folder owns presentation state and turns UI events and use-case streams into
+`features/chat/presentation/ai_chat_page.dart`. `ChatCubit` in `cubit/chat_cubit.dart`
+owns presentation state and turns UI events and use-case streams into
 `ChatState` updates. `AskQuestionUseCase` remains responsible for chat request
 orchestration.
+
+The page observes every Cubit update through `BlocConsumer`, keeping rendering,
+message-widget caching, auto-scroll, and post-frame visibility profiling in the
+widget. `ChatState` and `ChatMessage` retain identity equality: repeated content
+still emits a new state. State is readable immediately; stream notifications
+arrive asynchronously. Model readiness precedes knowledge preparation.
+
+The page closes a cubit it creates. An injected `AiChatPage(cubit: ...)` remains
+owned by the caller, who must `await cubit.close()` when finished. Closing guards
+against late results synchronously, cancels model observation and generation,
+and returns a future for cleanup. No AI, domain, retrieval, or prompt behavior
+is changed by this presentation-only state-management boundary.
 
 Change white-label chat text, source-display behavior, history limit, and UI
 settings in `features/chat/presentation/ai_chat_configuration.dart`.
 `AiChatTheme` contains visual customization such as colors, spacing, bubbles,
 and avatar styling; `AiChatConfiguration` contains chat text and behavior
-configuration. `chat_models.dart` contains only transient `ChatMessage` and
-`ChatState` presentation models.
+configuration. `cubit/chat_state.dart` contains only `ChatState` and its state
+helpers. `models/chat_message.dart` contains `ChatMessage` and `ChatAuthor`.
 
 The composer displays the configured local model label and, when available,
 the initialized inference model's selected runtime backend. After local

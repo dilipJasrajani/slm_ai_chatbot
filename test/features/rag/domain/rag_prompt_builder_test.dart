@@ -8,7 +8,12 @@ void main() {
       context: 'Knowledge Document 1\n\nTitle:\nNetwork guide',
     );
 
-    expect(prompt, contains('Do not invent facts'));
+    expect(
+      prompt,
+      contains(
+        'Do not invent, assume, or add facts that are not supported by the provided knowledge.',
+      ),
+    );
     expect(prompt, contains('Knowledge Document 1'));
     expect(prompt, contains('What does E123 mean?'));
     expect(
