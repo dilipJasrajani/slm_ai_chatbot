@@ -37,11 +37,7 @@ void main() {
       ]);
       expect(
         ragRepository.indexed.first.searchableText,
-        contains('code: E123'),
-      );
-      expect(
-        ragRepository.indexed.first.searchableText,
-        contains('Content:\nThe device cannot connect to the network.'),
+        'The device cannot connect to the network.',
       );
     },
   );

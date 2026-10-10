@@ -62,15 +62,7 @@ class JsonKnowledgeRecords {
         _nonEmpty(value['name']) ??
         _nonEmpty(value['code']) ??
         id;
-    final content =
-        _nonEmpty(value['text']) ??
-        _nonEmpty(value['content']) ??
-        _describe(value);
-    if (content.isEmpty) {
-      throw FormatException(
-        'Knowledge-base record "$path" in "$assetPath" has no searchable content.',
-      );
-    }
+    final content = jsonEncode(value);
     final metadata = <String, dynamic>{
       for (final key in [
         'type',
@@ -86,20 +78,12 @@ class JsonKnowledgeRecords {
     };
     final code = _nonEmpty(value['code']) ?? _messageCode(value);
     if (code != null) metadata['code'] = code;
-    final searchTerms = switch (value['phrasings']) {
-      final List<dynamic> phrases =>
-        phrases
-            .whereType<String>()
-            .where((phrase) => phrase.trim().isNotEmpty)
-            .join('\n'),
-      _ => _nonEmpty(value['search_text']),
-    };
     return KnowledgeDocument(
       id: id,
       title: title,
       content: content,
       measures: _nonEmpty(value['measures']),
-      searchText: searchTerms?.isNotEmpty == true ? searchTerms : null,
+      searchText: _nonEmpty(value['search_text']),
       metadata: Map.unmodifiable(metadata),
     );
   }
@@ -109,29 +93,6 @@ class JsonKnowledgeRecords {
     final text = value['text'];
     if (text is! String) return null;
     return RegExp(r'^Code: ([A-Za-z]+\.\d+)\b').firstMatch(text)?.group(1);
-  }
-
-  String _describe(Map<String, dynamic> record) {
-    return record.entries
-        .where(
-          (entry) => !{
-            'id',
-            'title',
-            'name',
-            'search_text',
-            'phrasings',
-            'metadata',
-          }.contains(entry.key),
-        )
-        .map((entry) => '${entry.key}: ${_format(entry.value)}')
-        .where((line) => line.trim().isNotEmpty)
-        .join('\n');
-  }
-
-  String _format(Object? value) {
-    if (value == null) return '';
-    if (value is String) return value;
-    return const JsonEncoder.withIndent('  ').convert(value);
   }
 
   String? _nonEmpty(Object? value) {

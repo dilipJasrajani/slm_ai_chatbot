@@ -31,6 +31,11 @@ void main() {
     expect(runtime.databasePaths, ['/local/rag.db']);
     expect(embeddingPrepared, 2);
     expect(runtime.indexedDocuments.single.id, 'error-e123');
+    expect(runtime.embeddedTexts, ['Device cannot connect to network']);
+    expect(
+      runtime.indexedDocuments.single.content,
+      'The device failed to establish a network connection.',
+    );
     expect(
       runtime.indexedDocuments.single.metadata,
       '{"_knowledgeDocument":{"title":"Device cannot connect to network","content":"The device failed to establish a network connection.","metadata":{"type":"error","code":"E123"}}}',
@@ -108,6 +113,8 @@ void main() {
     ]);
     final result = (await repository.search(query: 'water gauge low')).single;
 
+    expect(runtime.embeddedTexts, ['water gauge low\nPressure is low']);
+    expect(runtime.indexedDocuments.single.content, 'Pressure is low');
     expect(
       runtime.indexedDocuments.single.metadata,
       contains('"searchText":"water gauge low"'),
@@ -230,6 +237,7 @@ void main() {
 
 class _FakeRagRuntime extends FlutterGemmaRagRuntime {
   final databasePaths = <String>[];
+  final embeddedTexts = <String>[];
   final indexedDocuments = <_IndexedDocument>[];
   List<FlutterGemmaRagRuntimeResult> searchResults = const [
     FlutterGemmaRagRuntimeResult(
@@ -243,16 +251,24 @@ class _FakeRagRuntime extends FlutterGemmaRagRuntime {
   String? query;
 
   @override
+  Future<List<double>> embedDocumentText(String text) async {
+    embeddedTexts.add(text);
+    return [1, 0, 0];
+  }
+
+  @override
   Future<void> initializeVectorStore(String databasePath) async {
     databasePaths.add(databasePath);
   }
 
   @override
-  Future<void> addDocument({
+  Future<void> addDocumentWithEmbedding({
     required String id,
     required String content,
+    required List<double> embedding,
     String? metadata,
   }) async {
+    expect(embedding, [1, 0, 0]);
     indexedDocuments.add(
       _IndexedDocument(id: id, content: content, metadata: metadata),
     );

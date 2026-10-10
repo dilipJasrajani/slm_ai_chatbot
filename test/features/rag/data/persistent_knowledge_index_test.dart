@@ -81,6 +81,48 @@ void main() {
   });
 
   test(
+    'embeds search_text but stores the complete nested JSON record',
+    () async {
+      final record = {
+        'id': 'card:msg:f_74',
+        'title': 'FAULT F.74',
+        'text': 'Cause: Pressure too low',
+        'search_text': 'F.74 low pressure',
+        'measures': [
+          {'text': 'Refill the system'},
+        ],
+        'fix_procedures': [
+          {'id': 'card:proc:refill'},
+        ],
+      };
+      final fallbackRecord = {
+        'id': 'card:proc:refill',
+        'title': 'Refill the system',
+        'steps': ['Check pressure', 'Refill'],
+      };
+      final bundle = _AssetBundle(
+        jsonEncode({
+          'entries': [record, fallbackRecord],
+        }),
+      );
+      await _preparation(bundle, runtime, databasePath).index.prepare();
+
+      expect(runtime.embeddedTexts, [
+        'F.74 low pressure',
+        jsonEncode(fallbackRecord),
+      ]);
+      final stored = await runtime.store.searchSimilar(
+        queryEmbedding: [1, 0, 0],
+        topK: 2,
+      );
+      expect(
+        stored.map((result) => jsonDecode(result.content)),
+        containsAll([record, fallbackRecord]),
+      );
+    },
+  );
+
+  test(
     'same-size knowledge changes still invalidate the fingerprint',
     () async {
       await _preparation(
@@ -252,9 +294,16 @@ class _AssetBundle extends CachingAssetBundle {
 
 class _SqliteRuntime extends FlutterGemmaRagRuntime {
   final store = SqliteVectorStore();
+  final embeddedTexts = <String>[];
   var adds = 0;
   var clears = 0;
   int? failOnAdd;
+
+  @override
+  Future<List<double>> embedDocumentText(String text) async {
+    embeddedTexts.add(text);
+    return [1, 0, 0];
+  }
 
   @override
   Future<void> initializeVectorStore(String path) => store.initialize(path);
@@ -269,9 +318,10 @@ class _SqliteRuntime extends FlutterGemmaRagRuntime {
   }
 
   @override
-  Future<void> addDocument({
+  Future<void> addDocumentWithEmbedding({
     required String id,
     required String content,
+    required List<double> embedding,
     String? metadata,
   }) async {
     adds++;
@@ -279,7 +329,7 @@ class _SqliteRuntime extends FlutterGemmaRagRuntime {
     await store.addDocument(
       id: id,
       content: content,
-      embedding: [1, 0, 0],
+      embedding: embedding,
       metadata: metadata,
     );
   }

@@ -13,6 +13,63 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
+  test('limits semantic evidence to the two best grounded records', () async {
+    final ragRepository = _FakeRagRepository([
+      for (var index = 1; index <= 3; index++)
+        RagSearchResult(
+          document: KnowledgeDocument(
+            id: 'pressure-guide-$index',
+            title: 'Pressure guide $index',
+            content: 'Hydraulic pressure is low. Follow guide $index.',
+            metadata: const {},
+          ),
+          similarity: 1 - index * 0.1,
+        ),
+    ]);
+    final llm = _FakeLlmService(() => Stream.value('Check pressure.'));
+    final result = await AskQuestionUseCase(
+      ragRepository: ragRepository,
+      llmService: llm,
+    )('Why is hydraulic pressure low?');
+
+    expect(result.documents.map((document) => document.id), [
+      'pressure-guide-1',
+      'pressure-guide-2',
+    ]);
+    expect(llm.prompt, contains('Follow guide 2.'));
+    expect(llm.prompt, isNot(contains('Follow guide 3.')));
+  });
+
+  test(
+    'retains every directly requested fault even above the evidence cap',
+    () async {
+      final ragRepository = _FakeRagRepository([
+        for (final code in ['F.1', 'F.2', 'F.3'])
+          RagSearchResult(
+            document: KnowledgeDocument(
+              id: code,
+              title: 'Fault $code',
+              content: 'Pressure sensor fault $code.',
+              metadata: {'code': code},
+            ),
+            similarity: 1,
+          ),
+      ]);
+      final result = await AskQuestionUseCase(
+        ragRepository: ragRepository,
+        llmService: _FakeLlmService(
+          () => Stream.value('See the fault details.'),
+        ),
+      )('Compare pressure sensor faults F.1, F.2 and F.3');
+
+      expect(result.documents.map((document) => document.id), [
+        'F.1',
+        'F.2',
+        'F.3',
+      ]);
+    },
+  );
+
   test(
     'retrieves documents, builds a prompt, and generates an answer',
     () async {

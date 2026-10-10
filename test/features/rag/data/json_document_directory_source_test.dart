@@ -364,7 +364,7 @@ class _RecordingRagRepository implements RagRepository {
       indexedIds.add(document.document.id);
       await store?.addDocument(
         id: document.document.id,
-        content: document.searchableText,
+        content: document.document.content,
         embedding: [1.0, 0.0, 0.0],
       );
     }

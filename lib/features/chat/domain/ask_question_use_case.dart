@@ -8,6 +8,7 @@ import 'package:slm_ai_chatbot/features/chat/domain/conversational_prompt_builde
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/document_context_builder.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/knowledge_identifier_normalizer.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_prompt_builder.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
@@ -68,6 +69,8 @@ class AskQuestionUseCase {
   final ChatResponseConfiguration _responseConfiguration;
   final RetrievalQueryBuilder? _retrievalQueryBuilder;
   final ConversationHistory _conversationHistory;
+  static const _maxSupportingDocuments = 2;
+  static const _identifierNormalizer = KnowledgeIdentifierNormalizer();
 
   Future<void> cancel() => _llmService.stop();
 
@@ -204,11 +207,12 @@ class AskQuestionUseCase {
 
     if (profile != null) profile.retrievedCount = searchResults.length;
     profile?.mark(AiProfileEvent.groundingStart);
-    final documents = _relevance.relevantDocuments(
+    final groundedDocuments = _relevance.relevantDocuments(
       question: retrievalQuery,
       identifierQuestion: question,
       results: searchResults,
     );
+    final documents = _selectEvidence(groundedDocuments, question);
     profile?.mark(AiProfileEvent.groundingEnd);
     if (profile != null) profile.groundedCount = documents.length;
     _debugLog('retrievedCount=${searchResults.length}');
@@ -233,6 +237,36 @@ class AskQuestionUseCase {
     if (profile != null) profile.ragPromptCharacters = prompt.length;
     _debugLog('FALLBACK:\nfalse');
     yield* _generateResponse(prompt, documents, onGenerationComplete);
+  }
+
+  List<KnowledgeDocument> _selectEvidence(
+    List<KnowledgeDocument> documents,
+    String question,
+  ) {
+    final identifiers = _identifierNormalizer.extract(question);
+    final exact = <KnowledgeDocument>[];
+    final supporting = <KnowledgeDocument>[];
+    for (final document in documents) {
+      final documentIdentifiers = {
+        ..._identifierNormalizer.extract(document.id),
+        if (document.metadata['code'] case final String code)
+          ..._identifierNormalizer.extract(code),
+      };
+      if (identifiers.any(documentIdentifiers.contains)) {
+        exact.add(document);
+      } else if (supporting.length < _maxSupportingDocuments) {
+        supporting.add(document);
+      }
+    }
+    return [
+      ...exact,
+      ...supporting.take(
+        (_maxSupportingDocuments - exact.length).clamp(
+          0,
+          _maxSupportingDocuments,
+        ),
+      ),
+    ];
   }
 
   void _debugLog(String message) {

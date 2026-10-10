@@ -65,9 +65,13 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     await _prepareEmbeddingModel?.call();
     for (final document in documents) {
       _indexIdentifiers(document.document);
-      await _runtime.addDocument(
+      final embedding = await _runtime.embedDocumentText(
+        document.searchableText,
+      );
+      await _runtime.addDocumentWithEmbedding(
         id: document.document.id,
-        content: document.searchableText,
+        content: document.document.content,
+        embedding: embedding,
         metadata: jsonEncode({
           _documentMetadataKey: {
             'title': document.document.title,
@@ -194,6 +198,18 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
 
 /// Thin adapter around Flutter Gemma's vector-store API.
 class FlutterGemmaRagRuntime {
+  Future<List<double>> embedDocumentText(String text) {
+    final embeddingModel =
+        FlutterGemmaPlugin.instance.initializedEmbeddingModel;
+    if (embeddingModel == null) {
+      throw StateError('The local embedding model is not ready.');
+    }
+    return embeddingModel.generateEmbedding(
+      text,
+      taskType: TaskType.retrievalDocument,
+    );
+  }
+
   Future<void> initializeVectorStore(String databasePath) {
     return FlutterGemmaPlugin.instance.initializeVectorStore(databasePath);
   }
@@ -206,14 +222,16 @@ class FlutterGemmaRagRuntime {
     return FlutterGemmaPlugin.instance.clearVectorStore();
   }
 
-  Future<void> addDocument({
+  Future<void> addDocumentWithEmbedding({
     required String id,
     required String content,
+    required List<double> embedding,
     String? metadata,
   }) {
-    return FlutterGemmaPlugin.instance.addDocument(
+    return FlutterGemmaPlugin.instance.addDocumentWithEmbedding(
       id: id,
       content: content,
+      embedding: embedding,
       metadata: metadata,
     );
   }

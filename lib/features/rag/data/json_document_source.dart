@@ -79,11 +79,13 @@ class JsonDocumentSource implements DocumentSource {
       throw FormatException('Document at index $index must be a JSON object.');
     }
 
+    _requiredString(record, 'content', index);
     return KnowledgeDocument(
       id: _requiredString(record, 'id', index),
       title: _requiredString(record, 'title', index),
-      content: _requiredString(record, 'content', index),
+      content: jsonEncode(record),
       measures: _optionalString(record, 'measures', index),
+      searchText: _optionalString(record, 'search_text', index),
       metadata: _requiredMetadata(record, index),
     );
   }

@@ -32,6 +32,7 @@ class Qwen3OutputChannelParser {
     final channels = <String>[];
     var channelCount = 0;
     var thinkTags = 0;
+    var strayThinkCloses = 0;
     var endTokens = 0;
     final clock = onDiagnostics == null ? null : (Stopwatch()..start());
     Duration? firstThinkClose;
@@ -40,6 +41,7 @@ class Qwen3OutputChannelParser {
     final filteredOutput = _withoutThinkTags(
       _withoutEndOfTextTokens(rawOutput, onEndToken: () => endTokens++),
       onThinkTag: () => thinkTags++,
+      onStrayThinkClose: () => strayThinkCloses++,
       onThinkClose: () => firstThinkClose ??= clock?.elapsed,
       onPostThinkText: () => firstPostThinkText ??= clock?.elapsed,
     );
@@ -146,7 +148,8 @@ class Qwen3OutputChannelParser {
     onDiagnostics?.call(
       'Qwen output shape: channels=${channels.isEmpty ? 'none' : channels.join('>')} '
       '($channelCount total, first 12 shown), '
-      'thinkTags=$thinkTags, endTokens=$endTokens, '
+      'thinkTags=$thinkTags, strayThinkCloses=$strayThinkCloses, '
+      'endTokens=$endTokens, '
       'unmarkedPrefixCharacters=$unmarkedCharacters, '
       'sinceParserStart: thinkCloseMs=${firstThinkClose?.inMilliseconds ?? 'none'}, '
       'firstPostThinkTextMs=${firstPostThinkText?.inMilliseconds ?? 'none'}',
@@ -219,6 +222,7 @@ class Qwen3OutputChannelParser {
   Stream<({String text, bool afterThink})> _withoutThinkTags(
     Stream<String> rawOutput, {
     required void Function() onThinkTag,
+    required void Function() onStrayThinkClose,
     required void Function() onThinkClose,
     required void Function() onPostThinkText,
   }) async* {
@@ -246,21 +250,36 @@ class Qwen3OutputChannelParser {
         }
 
         final openingTagIndex = buffer.indexOf(openingTag);
-        if (openingTagIndex != -1) {
-          if (openingTagIndex > 0) {
-            final content = buffer.substring(0, openingTagIndex);
+        final closingTagIndex = buffer.indexOf(closingTag);
+        final nextTagIndex = openingTagIndex == -1
+            ? closingTagIndex
+            : closingTagIndex == -1 || openingTagIndex < closingTagIndex
+            ? openingTagIndex
+            : closingTagIndex;
+        if (nextTagIndex != -1) {
+          if (nextTagIndex > 0) {
+            final content = buffer.substring(0, nextTagIndex);
             if (closedThinkTag && content.trim().isNotEmpty) {
               onPostThinkText();
             }
             yield (text: content, afterThink: closedThinkTag);
           }
-          buffer = buffer.substring(openingTagIndex + openingTag.length);
-          insideThinkTag = true;
-          onThinkTag();
+          if (nextTagIndex == openingTagIndex) {
+            buffer = buffer.substring(nextTagIndex + openingTag.length);
+            insideThinkTag = true;
+            onThinkTag();
+          } else {
+            buffer = buffer.substring(nextTagIndex + closingTag.length);
+            onStrayThinkClose();
+          }
           continue;
         }
 
-        final suffix = _tagPrefixSuffix(buffer, openingTag);
+        final openingSuffix = _tagPrefixSuffix(buffer, openingTag);
+        final closingSuffix = _tagPrefixSuffix(buffer, closingTag);
+        final suffix = openingSuffix.length >= closingSuffix.length
+            ? openingSuffix
+            : closingSuffix;
         final contentLength = buffer.length - suffix.length;
         if (contentLength > 0) {
           final content = buffer.substring(0, contentLength);

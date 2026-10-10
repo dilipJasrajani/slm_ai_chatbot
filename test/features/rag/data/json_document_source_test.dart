@@ -21,6 +21,10 @@ void main() {
     expect(documents.last.metadata['code'], 'E456');
     expect(documents.last.metadata['type'], 'error');
     expect(documents.last.measures, isNull);
+    expect(
+      jsonDecode(documents.first.content),
+      _document(measures: 'Check that the device has network access.'),
+    );
   });
 
   test('rejects a document with a missing required field', () {
@@ -57,7 +61,7 @@ void main() {
   });
 
   test(
-    'loads linked passages and message cards without exposing phrasings as facts',
+    'uses search_text for embeddings and the full record for answers',
     () async {
       final source = JsonDocumentSource(
         assetBundle: _StringAssetBundle(
@@ -77,9 +81,16 @@ void main() {
                 'entity_type': 'message',
                 'title': 'FAULT F.74',
                 'text': 'Code: F.74\nCause: Pressure too low',
+                'search_text': 'F.74 low pressure',
                 'phrasings': ['Pressure keeps dropping after refill'],
                 'source_passage_ids': ['passage:p1'],
                 'pages': [74],
+                'measures': [
+                  {'text': 'Refill the system'},
+                ],
+                'fix_procedures': [
+                  {'id': 'card:proc:refill'},
+                ],
               },
             ],
           }),
@@ -92,10 +103,21 @@ void main() {
       expect(documents.last.metadata['code'], 'F.74');
       expect(documents.last.metadata['pages'], [74]);
       expect(documents.last.metadata['source_passage_ids'], ['passage:p1']);
-      expect(documents.last.searchText, 'Pressure keeps dropping after refill');
+      expect(documents.last.searchText, 'F.74 low pressure');
+      final storedRecord = jsonDecode(documents.last.content);
+      expect(storedRecord['phrasings'], [
+        'Pressure keeps dropping after refill',
+      ]);
+      expect(storedRecord['measures'], [
+        {'text': 'Refill the system'},
+      ]);
+      expect(storedRecord['fix_procedures'], [
+        {'id': 'card:proc:refill'},
+      ]);
+      expect(documents.first.searchText, isNull);
       expect(
-        documents.last.content,
-        isNot(contains('Pressure keeps dropping')),
+        jsonDecode(documents.first.content)['text'],
+        'Isolate power before servicing.',
       );
     },
   );
@@ -129,6 +151,8 @@ void main() {
     expect(documents.first.title, 'Low pressure');
     expect(documents.first.content, contains('Water loss'));
     expect(documents.first.content, contains('Vent'));
+    expect(jsonDecode(documents.first.content)['steps'], ['Fill', 'Vent']);
+    expect(documents.first.searchText, isNull);
     expect(documents.last.metadata['code'], 'X123');
   });
 
@@ -160,6 +184,22 @@ void main() {
       (await source.loadDocuments()).single.content,
       contains('Check the pump.'),
     );
+  });
+
+  test('legacy documents use explicit search_text when provided', () async {
+    final record = {..._document(), 'search_text': 'network help'};
+    final source = JsonDocumentSource(
+      assetBundle: _StringAssetBundle(
+        jsonEncode({
+          'version': 1,
+          'documents': [record],
+        }),
+      ),
+    );
+
+    final document = (await source.loadDocuments()).single;
+    expect(document.searchText, 'network help');
+    expect(jsonDecode(document.content), record);
   });
 }
 

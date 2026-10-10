@@ -24,7 +24,7 @@ class PersistentKnowledgeIndex {
        _ingestDocuments = ingestDocuments,
        _ragRepository = ragRepository;
 
-  static const _indexFormatVersion = '1';
+  static const _indexFormatVersion = '2';
 
   final AssetBundle _assetBundle;
   final String assetDirectory;

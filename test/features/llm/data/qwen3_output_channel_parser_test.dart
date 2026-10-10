@@ -323,6 +323,39 @@ void main() {
     expect(output, isEmpty);
   });
 
+  test(
+    'removes unexpected closing think tags in streamed answer text',
+    () async {
+      final diagnostics = <String>[];
+      final output =
+          await Qwen3OutputChannelParser(onDiagnostics: diagnostics.add)
+              .parse(
+                Stream.fromIterable([
+                  'Check the water pressure.',
+                  '</th',
+                  'ink> Then vent the system.',
+                ]),
+              )
+              .join();
+
+      expect(output, 'Check the water pressure. Then vent the system.');
+      expect(diagnostics.single, contains('strayThinkCloses=1'));
+    },
+  );
+
+  test('removes extra closing tags after a valid think block', () async {
+    final output = await parser
+        .parse(
+          Stream.fromIterable([
+            '<think>Private reasoning</think>',
+            'The pressure is low</think>. Top up with water.',
+          ]),
+        )
+        .join();
+
+    expect(output, 'The pressure is low. Top up with water.');
+  });
+
   test('suppresses end-of-text tokens split across streamed chunks', () async {
     final output = await parser
         .parse(Stream.fromIterable(['<|endo', 'ftext|>', "I'm here to help!"]))
