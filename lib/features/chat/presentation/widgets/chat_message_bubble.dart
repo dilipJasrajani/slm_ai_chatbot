@@ -89,129 +89,132 @@ class ChatMessageBubble extends StatelessWidget {
             message.text,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: textColor, height: 1.4),
+            ).textTheme.bodyMedium?.copyWith(color: textColor, height: 1.4, fontSize: 16),
           );
-    final content = Padding(
-      padding: EdgeInsets.only(bottom: theme.spacing * .75),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: isUser
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        children: [
-          // if (!isUser) ...[
-          //   AiAvatar(
-          //     theme: theme,
-          //     assistantName: assistantName,
-          //     assistantAvatar: assistantAvatar,
-          //   ),
-          //   const SizedBox(width: 8),
-          // ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isUser
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
-              children: [
-                Semantics(
-                  label: isUser ? 'Your message' : 'Assistant message',
-                  child: isUser
-                      ? Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: theme.spacing,
-                            vertical: theme.spacing * .75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: theme.userBubbleColor,
-                            borderRadius: BorderRadius.circular(
-                              theme.bubbleRadius,
-                            ),
-                            border: Border.all(
-                              color: message.isError
-                                  ? theme.primaryColor.withValues(alpha: .65)
-                                  : theme.borderColor,
-                            ),
-                          ),
-                          child: messageContent,
-                        )
-                      : Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: theme.spacing * .75,
-                          ),
-                          child: onFirstVisibleText == null
-                              ? messageContent
-                              : Builder(
-                                  builder: (contentContext) {
-                                    onFirstVisibleText!(contentContext);
-                                    return messageContent;
-                                  },
+    final content = Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * (isUser ? 0.75 : 0.88)),
+        child: Padding(
+          padding: EdgeInsets.only(bottom: theme.spacing * .75),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            children: [
+              // if (!isUser) ...[
+              //   AiAvatar(
+              //     theme: theme,
+              //     assistantName: assistantName,
+              //     assistantAvatar: assistantAvatar,
+              //   ),
+              //   const SizedBox(width: 8),
+              // ],
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: isUser
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    Semantics(
+                      label: isUser ? 'Your message' : 'Assistant message',
+                      child: isUser
+                          ? Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: theme.spacing,
+                                vertical: theme.spacing * .75,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.userBubbleColor,
+                                borderRadius: BorderRadius
+                                    .only(topLeft: Radius.circular(16),
+                                topRight: Radius.circular(16),
+                                bottomLeft: Radius.circular(16),
+                                bottomRight: Radius.circular(4),),
+                                border: Border.all(
+                                  color: message.isError
+                                      ? theme.primaryColor.withValues(alpha: .65)
+                                      : theme.borderColor,
                                 ),
+                              ),
+                              child: messageContent,
+                            )
+                          : Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: theme.spacing * .75,
+                              ),
+                              child: onFirstVisibleText == null
+                                  ? messageContent
+                                  : Builder(
+                                      builder: (contentContext) {
+                                        onFirstVisibleText!(contentContext);
+                                        return messageContent;
+                                      },
+                                    ),
+                            ),
+                    ),
+                    if (showTime || showCopy || showRegenerate)
+                      Padding(
+                        padding: EdgeInsets.only(top: theme.spacing * .01),
+                        child: Wrap(
+                          spacing: theme.spacing * .5,
+                          runSpacing: theme.spacing * .25,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (showTime)
+                              Text(
+                                '$generationTimeLabel ${(message.generationDuration!.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(2)}s',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: theme.secondaryTextColor),
+                              ),
+                            if (showCopy)
+                              CopyTextAction(text: message.text, theme: theme),
+                            if (showRegenerate)
+                              IconButton(
+                                tooltip: 'Regenerate response',
+                                onPressed: regenerateEnabled ? onRegenerate : null,
+                                icon: const Icon(Icons.refresh),
+                                iconSize: 18,
+                                style: IconButton.styleFrom(
+                                  foregroundColor: theme.secondaryTextColor,
+                                  minimumSize: const Size(36, 36),
+                                  padding: EdgeInsets.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                          ],
                         ),
+                      ),
+                    if (!isUser &&
+                        !message.isStreaming &&
+                        !message.isError &&
+                        showSources &&
+                        message.sources.isNotEmpty)
+                      _MessageSources(
+                        sources: message.sources,
+                        label: sourceSectionLabel,
+                        theme: theme,
+                      ),
+                    if (showRetry)
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.primaryColor,
+                        ),
+                        onPressed:
+                            retryEnabled &&
+                                message.question?.trim().isNotEmpty == true
+                            ? onRetry
+                            : null,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                  ],
                 ),
-                if (showTime || showCopy || showRegenerate)
-                  Padding(
-                    padding: EdgeInsets.only(top: theme.spacing * .01),
-                    child: Wrap(
-                      spacing: theme.spacing * .5,
-                      runSpacing: theme.spacing * .25,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (showTime)
-                          Text(
-                            '$generationTimeLabel ${(message.generationDuration!.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(2)}s',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: theme.backgroundTextColor.withValues(
-                                    alpha: .75,
-                                  ),
-                                ),
-                          ),
-                        if (showCopy)
-                          CopyTextAction(text: message.text, theme: theme),
-                        if (showRegenerate)
-                          IconButton(
-                            tooltip: 'Regenerate response',
-                            onPressed: regenerateEnabled ? onRegenerate : null,
-                            icon: const Icon(Icons.refresh),
-                            iconSize: 18,
-                            style: IconButton.styleFrom(
-                              foregroundColor: theme.backgroundTextColor
-                                  .withValues(alpha: .75),
-                              minimumSize: const Size(36, 36),
-                              padding: EdgeInsets.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                if (!isUser &&
-                    !message.isStreaming &&
-                    !message.isError &&
-                    showSources &&
-                    message.sources.isNotEmpty)
-                  _MessageSources(
-                    sources: message.sources,
-                    label: sourceSectionLabel,
-                    theme: theme,
-                  ),
-                if (showRetry)
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.primaryColor,
-                    ),
-                    onPressed:
-                        retryEnabled &&
-                            message.question?.trim().isNotEmpty == true
-                        ? onRetry
-                        : null,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
     return _MessageEntrance(
@@ -238,7 +241,7 @@ class _MessageSources extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final metadataColor = theme.backgroundTextColor.withValues(alpha: .75);
+    final metadataColor = theme.secondaryTextColor;
     return Padding(
       padding: EdgeInsets.only(top: theme.spacing * .5),
       child: Column(

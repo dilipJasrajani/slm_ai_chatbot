@@ -1,4 +1,4 @@
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 
 /// Ensures the local EmbeddingGemma model is installed and active for RAG.
 class FlutterGemmaEmbeddingModelInitializer {
@@ -23,15 +23,15 @@ class FlutterGemmaEmbeddingModelInitializer {
   }
 
   Future<void> _ensureReady() async {
-    if (!FlutterGemma.hasActiveEmbedder()) {
-      await FlutterGemma.installEmbedder()
+    if (!FlutterEdgeAi.hasActiveEmbedder()) {
+      await FlutterEdgeAi.installEmbedder()
           .modelFromNetwork(_modelUrl, token: _downloadToken)
           .tokenizerFromNetwork(_tokenizerUrl, token: _downloadToken)
           .install();
     }
 
-    if (FlutterGemmaPlugin.instance.initializedEmbeddingModel == null) {
-      await FlutterGemma.getActiveEmbedder(
+    if (FlutterEdgeAiPlugin.instance.initializedEmbeddingModel == null) {
+      await FlutterEdgeAi.getActiveEmbedder(
         preferredBackend: PreferredBackend.cpu,
       );
     }

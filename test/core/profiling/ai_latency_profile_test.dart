@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
@@ -435,10 +435,11 @@ class _Model implements InferenceModel {
   PreferredBackend? get activeBackend => null;
   @override
   Future<InferenceModelSession> createSession({
-    double temperature = .8,
-    int randomSeed = 1,
-    int topK = 1,
+    double? temperature,
+    int? randomSeed,
+    int? topK,
     double? topP,
+    int? maxOutputTokens,
     String? loraPath,
     bool? enableVisionModality,
     bool? enableAudioModality,

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
-import 'package:flutter_gemma_embeddings/flutter_gemma_embeddings.dart';
-import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
-import 'package:flutter_gemma_rag_sqlite/flutter_gemma_rag_sqlite.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
+import 'package:flutter_edge_ai_embeddings/flutter_edge_ai_embeddings.dart';
+import 'package:flutter_edge_ai_litertlm/flutter_edge_ai_litertlm.dart';
 
 import 'app/app.dart';
 import 'app/app_dependencies.dart';
@@ -11,10 +10,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // The local AI runtime must be ready before dependency composition.
-  await FlutterGemma.initialize(
+  await FlutterEdgeAi.initialize(
     inferenceEngines: [LiteRtLmEngine()],
     embeddingBackends: const [LiteRtEmbeddingBackend()],
-    vectorStore: SqliteVectorStore(),
+    embeddingTokenizers: const [GemmaEmbeddingTokenizers()],
   );
 
   final dependencies = await createAppDependencies();

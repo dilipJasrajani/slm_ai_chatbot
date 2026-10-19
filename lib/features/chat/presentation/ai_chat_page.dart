@@ -367,8 +367,8 @@ class _AiChatPageState extends State<AiChatPage> {
         backgroundColor: chatTheme.backgroundColor,
         appBar: AppBar(
           title: Text(widget.configuration.title),
-          backgroundColor: chatTheme.surfaceColor,
-          foregroundColor: chatTheme.surfaceTextColor,
+          backgroundColor: chatTheme.backgroundColor,
+          foregroundColor: chatTheme.backgroundTextColor,
           actions: [
             IconButton(
               tooltip: 'Clear conversation',
@@ -426,20 +426,17 @@ class _AiChatPageState extends State<AiChatPage> {
                     : ListView.builder(
                         controller: _scrollController,
                         padding: EdgeInsets.symmetric(
-                          horizontal: chatTheme.spacing,
+                          horizontal: 10,
                           vertical: chatTheme.spacing,
                         ),
                         itemCount: state.messages.length,
                         itemBuilder: (context, index) => Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: _messageAt(
-                              state.messages[index],
-                              isLatestAssistant:
-                                  index == state.messages.length - 1 &&
-                                  state.messages[index].author ==
-                                      ChatAuthor.assistant,
-                            ),
+                          child: _messageAt(
+                            state.messages[index],
+                            isLatestAssistant:
+                                index == state.messages.length - 1 &&
+                                state.messages[index].author ==
+                                    ChatAuthor.assistant,
                           ),
                         ),
                       ),

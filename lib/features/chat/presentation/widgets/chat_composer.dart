@@ -38,17 +38,15 @@ class ChatComposer extends StatelessWidget {
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: theme.inputTextColor),
-                  cursorColor: theme.primaryColor,
+                  cursorColor: theme.buttonColor,
                   minLines: 1,
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
                   decoration: InputDecoration(
                     labelText: 'Ask a question',
-                    labelStyle: TextStyle(
-                      color: theme.inputTextColor.withValues(alpha: .75),
-                    ),
-                    floatingLabelStyle: TextStyle(color: theme.primaryColor),
+                    labelStyle: TextStyle(color: theme.secondaryTextColor),
+                    floatingLabelStyle: TextStyle(color: theme.buttonColor),
                     filled: true,
                     fillColor: theme.inputBackgroundColor,
                     border: OutlineInputBorder(
@@ -62,7 +60,7 @@ class ChatComposer extends StatelessWidget {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(theme.bubbleRadius),
                       borderSide: BorderSide(
-                        color: theme.primaryColor,
+                        color: theme.buttonColor,
                         width: 2,
                       ),
                     ),
@@ -70,15 +68,7 @@ class ChatComposer extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton.filled(
-                tooltip: 'Send message',
-                onPressed: enabled ? onSend : null,
-                style: IconButton.styleFrom(
-                  backgroundColor: theme.primaryColor,
-                  foregroundColor: theme.primaryTextColor,
-                ),
-                icon: const Icon(Icons.send),
-              ),
+              SendButton(enabled: enabled, onPressed: onSend, theme: theme),
             ],
           ),
           if (modelLabel != null)
@@ -91,11 +81,74 @@ class ChatComposer extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: theme.backgroundTextColor.withValues(alpha: .75),
+                  color: theme.secondaryTextColor,
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class SendButton extends StatelessWidget {
+  const SendButton({
+    super.key,
+    required this.enabled,
+    required this.onPressed,
+    required this.theme,
+  });
+
+  final bool enabled;
+  final VoidCallback onPressed;
+  final AiChatTheme theme;
+
+  static const double _size = 48;
+  static const double _radius = 14;
+  static const Duration _duration = Duration(milliseconds: 150);
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = enabled
+        ? theme.buttonColor
+        : theme.secondaryTextColor.withValues(alpha: .12);
+    final fg = enabled
+        ? theme.buttonTextColor
+        : theme.secondaryTextColor.withValues(alpha: .38);
+
+    return Tooltip(
+      message: 'Send message',
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: 'Send message',
+        child: AnimatedContainer(
+          duration: _duration,
+          width: _size,
+          height: _size,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(_radius),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(_radius),
+              onTap: enabled ? onPressed : null,
+              child: Center(
+                child: TweenAnimationBuilder<Color?>(
+                  duration: _duration,
+                  tween: ColorTween(end: fg),
+                  builder: (_, color, __) => Icon(
+                    Icons.arrow_upward_rounded,
+                    size: 24,
+                    color: color,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

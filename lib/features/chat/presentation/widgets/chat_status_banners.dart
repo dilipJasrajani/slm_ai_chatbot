@@ -23,6 +23,11 @@ class ModelStatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.status == ModelStatus.ready) return const SizedBox.shrink();
+    final statusColor = switch (state.status) {
+      ModelStatus.error => Theme.of(context).colorScheme.error,
+      ModelStatus.downloading => Theme.of(context).colorScheme.tertiary,
+      _ => theme.primaryColor,
+    };
     final message = switch (state.status) {
       ModelStatus.notDownloaded => 'Preparing local AI model…',
       ModelStatus.downloading =>
@@ -38,7 +43,7 @@ class ModelStatusBanner extends StatelessWidget {
       label: message,
       child: Container(
         width: double.infinity,
-        color: theme.primaryColor.withValues(alpha: .10),
+        color: statusColor.withValues(alpha: .10),
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,16 +52,14 @@ class ModelStatusBanner extends StatelessWidget {
             if (state.status == ModelStatus.error && showRetryAction)
               TextButton.icon(
                 onPressed: onRetry,
-                style: TextButton.styleFrom(
-                  foregroundColor: theme.primaryColor,
-                ),
+                style: TextButton.styleFrom(foregroundColor: statusColor),
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry model loading'),
               ),
             if (state.status == ModelStatus.downloading) ...[
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                color: theme.primaryColor,
+                color: statusColor,
                 value: state.downloadProgress == null
                     ? null
                     : state.downloadProgress! / 100,
@@ -85,12 +88,15 @@ class KnowledgeStatusBanner extends StatelessWidget {
     final message =
         state.knowledgeError ??
         'Preparing local knowledge for private, offline answers…';
+    final statusColor = state.knowledgeError == null
+        ? Theme.of(context).colorScheme.tertiary
+        : Theme.of(context).colorScheme.error;
     return Semantics(
       liveRegion: true,
       label: message,
       child: Container(
         width: double.infinity,
-        color: theme.primaryColor.withValues(alpha: .10),
+        color: statusColor.withValues(alpha: .10),
         padding: const EdgeInsets.all(12),
         child: Text(
           message,

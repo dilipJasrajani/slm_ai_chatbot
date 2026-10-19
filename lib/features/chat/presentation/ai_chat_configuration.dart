@@ -3,8 +3,19 @@ import 'package:flutter/material.dart';
 /// White-label visual styling for the chat experience.
 @immutable
 class AiChatTheme {
+  static const brandColor = Color(0xFFFFE4DF);
+  static const brandDark = Color(0xFFCC2C08);
+  static const white = Color(0xFFFFFFFF);
+  static const background = Color(0xFFF3F1F1);
+  static const textPrimary = Color(0xFF101314);
+  static const textSecondary = Color(0xFF6D7276);
+  static const error = Color(0xFFCC2C08);
+  static const warning = Color(0xFFFFB000);
+  static const button = Color(0xFFCC2C08);
+
   const AiChatTheme({
     Color? primaryColor,
+    Color? buttonColor,
     Color? accentColor,
     Color? backgroundColor,
     Color? surfaceColor,
@@ -20,6 +31,7 @@ class AiChatTheme {
     this.spacing = 16,
     this.animationDuration = const Duration(milliseconds: 180),
   }) : _primaryColor = primaryColor,
+       _buttonColor = buttonColor,
        _accentColor = accentColor,
        _backgroundColor = backgroundColor,
        _surfaceColor = surfaceColor,
@@ -31,6 +43,7 @@ class AiChatTheme {
        _inputBackgroundColor = inputBackgroundColor;
 
   final Color? _primaryColor;
+  final Color? _buttonColor;
   final Color? _accentColor;
   final Color? _backgroundColor;
   final Color? _surfaceColor;
@@ -41,33 +54,39 @@ class AiChatTheme {
   final Color? _borderColor;
   final Color? _inputBackgroundColor;
 
-  Color get primaryColor => _primaryColor ?? const Color.fromARGB(255, 204, 44, 8);
-  Color get accentColor => _accentColor ?? const Color(0xFF00A8A8);
-  Color get backgroundColor => _backgroundColor ?? const Color(0xFFF9FAFF);
-  Color get surfaceColor => _surfaceColor ?? Colors.white;
-  Color get userBubbleColor => _userBubbleColor ?? primaryColor;
-  Color get assistantBubbleColor =>
-      _assistantBubbleColor ?? const Color(0xFFF1F3F8);
+  Color get buttonColor =>
+      _buttonColor ?? (_primaryColor == null ? button : primaryColor);
+  Color get buttonTextColor => _readableOn(buttonColor);
+  Color get primaryColor => _primaryColor ?? brandColor;
+  Color get accentColor => _accentColor ?? brandDark;
+  Color get backgroundColor => _backgroundColor ?? background;
+  Color get surfaceColor => _surfaceColor ?? white;
+  Color get userBubbleColor => _userBubbleColor ?? accentColor;
+  Color get assistantBubbleColor => _assistantBubbleColor ?? surfaceColor;
   Color get primaryTextColor => _readableOn(primaryColor);
   Color get userTextColor => _userTextColor ?? _readableOn(userBubbleColor);
   Color get assistantTextColor =>
       _assistantTextColor ?? _readableOn(backgroundColor);
   Color get surfaceTextColor => _readableOn(surfaceColor);
   Color get backgroundTextColor => _readableOn(backgroundColor);
+  Color get secondaryTextColor =>
+      ThemeData.estimateBrightnessForColor(backgroundColor) == Brightness.dark
+      ? backgroundTextColor.withValues(alpha: .75)
+      : textSecondary;
   Color get inputTextColor => _readableOn(inputBackgroundColor);
-  Color get borderColor => _borderColor ?? const Color(0xFFD7DBE8);
-  Color get inputBackgroundColor => _inputBackgroundColor ?? Colors.white;
+  Color get borderColor => _borderColor ?? textSecondary.withValues(alpha: .35);
+  Color get inputBackgroundColor => _inputBackgroundColor ?? white;
 
   static Color _readableOn(Color background) =>
-      ThemeData.estimateBrightnessForColor(background) == Brightness.dark
-      ? Colors.white
-      : const Color(0xFF1A1C20);
+      background.computeLuminance() < .179 ? white : textPrimary;
 
   /// Uses the host's dark palette for colors the consumer has not overridden.
   AiChatTheme resolve(ColorScheme colorScheme) {
     if (colorScheme.brightness != Brightness.dark) return this;
     return AiChatTheme(
       primaryColor: _primaryColor ?? colorScheme.primary,
+      buttonColor:
+          _buttonColor ?? (_primaryColor == null ? colorScheme.primary : null),
       accentColor: _accentColor ?? colorScheme.secondary,
       backgroundColor: _backgroundColor ?? colorScheme.surface,
       surfaceColor: _surfaceColor ?? colorScheme.surface,
@@ -113,7 +132,7 @@ class AiChatConfiguration {
       'What does error F.94 mean?',
       'How do I troubleshoot a Communication error PlusBus?',
     ],
-    this.showLocalSources = true,
+    this.showLocalSources = false,
     this.sourceSectionLabel = 'Sources',
     this.modelLabel = 'Qwen3 0.6B \u00B7 Local',
     this.showModelLabel = true,
@@ -124,7 +143,7 @@ class AiChatConfiguration {
     this.showRegenerateAction = true,
     this.showRetryAction = true,
     this.scrollThreshold = 160,
-    this.maxHistoryMessages = 3,
+    this.maxHistoryMessages = 4,
   });
 
   final String title;

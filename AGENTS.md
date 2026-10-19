@@ -52,9 +52,8 @@ Use **BLoC/Cubit** for presentation state management and dependency injection wh
 
 Use:
 
-* `flutter_gemma`
-* `flutter_gemma_mediapipe`
-* `flutter_gemma_rag_sqlite`
+* `flutter_edge_ai` and `flutter_edge_ai_litertlm`
+* `flutter_edge_ai_rag` and `flutter_edge_ai_sqlite`
 
 Initial model:
 
@@ -73,7 +72,7 @@ abstract class LlmRepository {
 }
 ```
 
-Do not couple Domain or Presentation directly to `flutter_gemma`.
+Do not couple Domain or Presentation directly to `flutter_edge_ai`.
 
 ---
 
@@ -99,7 +98,7 @@ Local SLM
 Answer
 ```
 
-Use `EmbeddingGemma` through the supported `flutter_gemma` ecosystem for embeddings.
+Use `EmbeddingGemma` through the supported `flutter_edge_ai` ecosystem for embeddings.
 
 Keep RAG behind repository/service abstractions.
 
@@ -129,7 +128,7 @@ Before making changes:
 1. Read this file.
 2. Read `CODE_AGENT.md`.
 3. Inspect the existing project and `pubspec.yaml`.
-4. Check the **current package documentation/API** before using `flutter_gemma` APIs.
+4. Check the **current package documentation/API** before using `flutter_edge_ai` APIs.
 5. Never invent package APIs or assume outdated examples.
 
 Implement only the requested phase/task.

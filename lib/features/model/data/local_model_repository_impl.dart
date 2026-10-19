@@ -1,4 +1,4 @@
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 
 import '../domain/local_model_repository.dart';
 import 'local_model_configuration.dart';
@@ -17,12 +17,14 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
   InferenceModel? _loadedModel;
 
   Future<InferenceModel> get loadedModel async {
-    return _loadedModel ??= await FlutterGemma.getActiveModel(maxTokens: 1024 * 10);
+    return _loadedModel ??= await FlutterEdgeAi.getActiveModel(
+      maxTokens: 1024 * 10,
+    );
   }
 
   @override
   Future<bool> isInstalled() {
-    return FlutterGemma.isModelInstalled(_configuration.fileName);
+    return FlutterEdgeAi.isModelInstalled(_configuration.fileName);
   }
 
   @override
@@ -41,7 +43,7 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
   }
 
   InferenceInstallationBuilder _installer() {
-    final installer = FlutterGemma.installModel(
+    final installer = FlutterEdgeAi.installModel(
       modelType: _configuration.modelType,
       fileType: ModelFileType.litertlm,
     );

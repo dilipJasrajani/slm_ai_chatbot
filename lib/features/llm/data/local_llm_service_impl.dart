@@ -1,4 +1,4 @@
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
@@ -35,14 +35,14 @@ class LocalLlmServiceImpl implements LocalLlmService {
       temperature: 1.0,
       topK: 64,
       topP: 0.95,
-      enableThinking: false,
+      enableThinking: true,
     );
     _activeSession = session;
 
     try {
       await session.addQueryChunk(
         Message(
-          text: _usesQwen3Output ? '$prompt /no_think' : prompt,
+          text: prompt,
           isUser: true,
         ),
       );

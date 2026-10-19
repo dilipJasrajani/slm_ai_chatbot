@@ -79,7 +79,7 @@ LocalLlmService
     ↓
 LocalLlmServiceImpl
     ↓
-flutter_gemma / selected local model
+flutter_edge_ai + LiteRT-LM / selected local model
 ```
 
 Both answer paths depend on the generic `LocalLlmService`. Its local
@@ -141,9 +141,14 @@ SQLite vector storage
 
 `JsonDocumentSource` loads the asset into generic `KnowledgeDocument` values.
 `IngestDocumentsUseCase` creates stable searchable text for each document and
-passes it to `RagRepository`. The Flutter Gemma repository uses
-EmbeddingGemma to create vectors and persists them in its local SQLite vector
-store, alongside metadata needed to reconstruct the original document.
+passes it to `RagRepository`. The Flutter Edge AI adapter uses EmbeddingGemma
+to create vectors and persists them in a profile-bound SQLite vector index,
+alongside metadata needed to reconstruct the original document. A new
+`technical_support_rag_v2.db` database is built on upgrade; old vectors remain
+untouched because the new SQLite index has a different storage format. When
+an embedding input exceeds the model's token limit, the adapter shortens
+document text from the end or query history from the beginning; stored answer
+content remains complete.
 
 ### Question retrieval
 

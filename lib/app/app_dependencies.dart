@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:slm_ai_chatbot/features/chat/data/local_llm_chat_intent_router.dart';
@@ -74,10 +74,11 @@ Future<AppDependencies> createAppDependencies() async {
     downloadToken: const String.fromEnvironment('HUGGING_FACE_TOKEN'),
   );
   final supportDirectory = await getApplicationSupportDirectory();
-  final databasePath = '${supportDirectory.path}/technical_support_rag.db';
+  final databasePath = '${supportDirectory.path}/technical_support_rag_v2.db';
   final ragRepository = FlutterGemmaRagSqliteRepository(
     prepareEmbeddingModel: embeddingModelInitializer.ensureReady,
     databasePathProvider: () async => databasePath,
+    embeddingProfileId: FlutterGemmaEmbeddingModelInitializer.indexIdentity,
   );
   final chatIntentRouter = LocalLlmChatIntentRouter(
     llmService: llmService,
@@ -146,7 +147,7 @@ Future<AppDependencies> createAppDependencies() async {
     retrievalEvaluationRunner: retrievalEvaluationRunner,
     prepareKnowledgeBase: knowledgeBasePreparation.prepareKnowledgeBase,
     runtimeBackendLabel: () =>
-        switch (FlutterGemmaPlugin.instance.initializedModel?.activeBackend) {
+        switch (FlutterEdgeAiPlugin.instance.initializedModel?.activeBackend) {
           PreferredBackend.cpu => 'CPU',
           PreferredBackend.gpu => 'GPU',
           PreferredBackend.npu => 'NPU',

@@ -1,6 +1,8 @@
 import 'dart:convert';
 
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
+import 'package:flutter_edge_ai_rag/flutter_edge_ai_rag.dart';
+import 'package:flutter_edge_ai_sqlite/flutter_edge_ai_sqlite.dart';
 
 import 'package:slm_ai_chatbot/core/profiling/ai_latency_profile.dart';
 import '../domain/knowledge_document.dart';
@@ -8,6 +10,7 @@ import '../domain/knowledge_identifier_normalizer.dart';
 import '../domain/rag_document.dart';
 import '../domain/rag_repository.dart';
 import '../domain/rag_search_result.dart';
+import 'flutter_gemma_embedding_model_initializer.dart';
 
 /// Uses EmbeddingGemma and the Flutter Gemma SQLite vector store for RAG.
 class FlutterGemmaRagSqliteRepository implements RagRepository {
@@ -17,11 +20,14 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
     required Future<String> Function() databasePathProvider,
     Future<void> Function()? prepareEmbeddingModel,
     FlutterGemmaRagRuntime? runtime,
+    String embeddingProfileId =
+        FlutterGemmaEmbeddingModelInitializer.indexIdentity,
     KnowledgeIdentifierNormalizer identifierNormalizer =
         const KnowledgeIdentifierNormalizer(),
   }) : _databasePathProvider = databasePathProvider,
        _prepareEmbeddingModel = prepareEmbeddingModel,
-       _runtime = runtime ?? FlutterGemmaRagRuntime(),
+       _runtime =
+           runtime ?? FlutterGemmaRagRuntime(profileId: embeddingProfileId),
        _identifierNormalizer = identifierNormalizer;
 
   final Future<String> Function() _databasePathProvider;
@@ -196,30 +202,88 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
   }
 }
 
-/// Thin adapter around Flutter Gemma's vector-store API.
+/// Thin adapter around the profile-bound SQLite vector index.
 class FlutterGemmaRagRuntime {
-  Future<List<double>> embedDocumentText(String text) {
-    final embeddingModel =
-        FlutterGemmaPlugin.instance.initializedEmbeddingModel;
+  FlutterGemmaRagRuntime({
+    this.profileId = FlutterGemmaEmbeddingModelInitializer.indexIdentity,
+    EmbeddingModel? Function()? embeddingModelProvider,
+  }) : _embeddingModelProvider =
+           embeddingModelProvider ??
+           (() => FlutterEdgeAiPlugin.instance.initializedEmbeddingModel);
+
+  final String profileId;
+  final EmbeddingModel? Function() _embeddingModelProvider;
+  RagIndex? _index;
+  static const _embeddingDimension = 768;
+
+  RagIndex get _readyIndex =>
+      _index ??
+      (throw StateError('The local vector index is not initialized.'));
+
+  Future<List<double>> embedDocumentText(String text) =>
+      _embedText(text, TaskType.retrievalDocument);
+
+  Future<List<double>> _embedText(
+    String text,
+    TaskType taskType, {
+    bool keepEnd = false,
+  }) async {
+    final embeddingModel = _embeddingModelProvider();
     if (embeddingModel == null) {
       throw StateError('The local embedding model is not ready.');
     }
-    return embeddingModel.generateEmbedding(
-      text,
-      taskType: TaskType.retrievalDocument,
-    );
+    var input = text;
+    while (true) {
+      try {
+        return await embeddingModel.embed(
+          EmbeddingInput.text(input),
+          taskType: taskType,
+        );
+      } on EmbeddingInputTooLongException catch (error) {
+        if (input.length <= 1) rethrow;
+        final actualTokens = error.actualTokens;
+        final fraction =
+            actualTokens != null && actualTokens > error.maxInputTokens
+            ? (error.maxInputTokens - 4) / actualTokens
+            : 0.5;
+        final length = (input.length * fraction).floor().clamp(
+          1,
+          input.length - 1,
+        );
+        input = keepEnd
+            ? input.substring(input.length - length)
+            : input.substring(0, length);
+      }
+    }
   }
 
-  Future<void> initializeVectorStore(String databasePath) {
-    return FlutterGemmaPlugin.instance.initializeVectorStore(databasePath);
+  Future<void> initializeVectorStore(String databasePath) async {
+    _index =
+        await FlutterEdgeAiRag(
+          providers: [const SqliteVectorStoreProvider()],
+        ).openVectors(
+          spec: VectorStoreSpec(
+            providerId: SqliteVectorStoreProvider.providerId,
+            location: databasePath,
+          ),
+          profile: EmbeddingProfile(
+            id: profileId,
+            dimension: _embeddingDimension,
+          ),
+        );
+  }
+
+  Future<void> dispose() async {
+    await _index?.dispose();
+    _index = null;
   }
 
   Future<VectorStoreStats> getVectorStoreStats() {
-    return FlutterGemmaPlugin.instance.getVectorStoreStats();
+    return _readyIndex.stats();
   }
 
   Future<void> clearVectorStore() {
-    return FlutterGemmaPlugin.instance.clearVectorStore();
+    return _readyIndex.clear();
   }
 
   Future<void> addDocumentWithEmbedding({
@@ -228,7 +292,7 @@ class FlutterGemmaRagRuntime {
     required List<double> embedding,
     String? metadata,
   }) {
-    return FlutterGemmaPlugin.instance.addDocumentWithEmbedding(
+    return _readyIndex.addVector(
       id: id,
       content: content,
       embedding: embedding,
@@ -241,8 +305,13 @@ class FlutterGemmaRagRuntime {
     required int topK,
     required double threshold,
   }) async {
-    final results = await FlutterGemmaPlugin.instance.searchSimilar(
-      query: query,
+    final queryEmbedding = await _embedText(
+      query,
+      TaskType.retrievalQuery,
+      keepEnd: true,
+    );
+    final results = await _readyIndex.searchVector(
+      embedding: queryEmbedding,
       topK: topK,
       threshold: threshold,
     );

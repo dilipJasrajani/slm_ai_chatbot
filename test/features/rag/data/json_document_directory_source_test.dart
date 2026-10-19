@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show FlutterError;
 import 'package:flutter/services.dart';
-import 'package:flutter_gemma_rag_sqlite/flutter_gemma_rag_sqlite.dart';
+import 'package:flutter_edge_ai_rag/flutter_edge_ai_rag.dart';
+import 'package:flutter_edge_ai_sqlite/flutter_edge_ai_sqlite.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/rag/data/json_document_directory_source.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/ingest_documents_use_case.dart';
@@ -283,18 +284,26 @@ void main() {
     final directory = await Directory.systemTemp.createTemp(
       'knowledge_ingest_',
     );
-    final store = SqliteVectorStore();
+    final store =
+        await FlutterEdgeAiRag(
+          providers: [const SqliteVectorStoreProvider()],
+        ).openVectors(
+          spec: VectorStoreSpec(
+            providerId: 'sqlite',
+            location: '${directory.path}/knowledge.db',
+          ),
+          profile: EmbeddingProfile(id: 'ingest-test-v1', dimension: 3),
+        );
     try {
-      await store.initialize('${directory.path}/knowledge.db');
       final result = await IngestDocumentsUseCase(
         documentSource: source,
         ragRepository: _RecordingRagRepository(store: store),
       )();
 
       expect(result.documentCount, documents.length);
-      expect((await store.getStats()).documentCount, documents.length);
+      expect((await store.stats()).documentCount, documents.length);
     } finally {
-      await store.close();
+      await store.dispose();
       await directory.delete(recursive: true);
     }
   });
@@ -352,7 +361,7 @@ class _ManifestAssetBundle extends CachingAssetBundle {
 class _RecordingRagRepository implements RagRepository {
   _RecordingRagRepository({this.store});
 
-  final SqliteVectorStore? store;
+  final RagIndex? store;
   final indexedIds = <String>[];
 
   @override
@@ -362,7 +371,7 @@ class _RecordingRagRepository implements RagRepository {
   Future<void> indexDocuments(Iterable<RagDocument> documents) async {
     for (final document in documents) {
       indexedIds.add(document.document.id);
-      await store?.addDocument(
+      await store?.addVector(
         id: document.document.id,
         content: document.document.content,
         embedding: [1.0, 0.0, 0.0],

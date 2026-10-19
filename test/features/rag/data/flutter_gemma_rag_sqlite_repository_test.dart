@@ -1,9 +1,53 @@
+import 'dart:io';
+
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_rag_sqlite_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_document.dart';
 
 void main() {
+  test(
+    'overlong inputs retain document starts and current questions',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'rag_input_limit_',
+      );
+      final model = _LengthLimitedEmbeddingModel();
+      final runtime = FlutterGemmaRagRuntime(
+        embeddingModelProvider: () => model,
+      );
+      try {
+        await runtime.initializeVectorStore('${directory.path}/index.db');
+        final documentEmbedding = await runtime.embedDocumentText(
+          'F.94 has a documented electrical cause and resolution.',
+        );
+        await runtime.addDocumentWithEmbedding(
+          id: 'F.94',
+          content: 'Complete F.94 knowledge.',
+          embedding: documentEmbedding,
+        );
+        final hits = await runtime.searchSimilar(
+          query: 'Earlier unrelated context. What is F.94?',
+          topK: 1,
+          threshold: 0,
+        );
+
+        expect(hits.single.id, 'F.94');
+        expect(model.inputs.first.text, startsWith('F.94'));
+        expect(model.inputs.last.text, endsWith('F.94?'));
+        expect(
+          model.inputs.map((input) => input.taskType),
+          containsAll([TaskType.retrievalDocument, TaskType.retrievalQuery]),
+        );
+        expect(model.inputs.any((input) => input.text.length <= 12), isTrue);
+      } finally {
+        await runtime.dispose();
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
   test('initializes once, indexes documents, and maps search results', () async {
     final runtime = _FakeRagRuntime();
     var embeddingPrepared = 0;
@@ -295,4 +339,37 @@ class _IndexedDocument {
   final String id;
   final String content;
   final String? metadata;
+}
+
+final class _LengthLimitedEmbeddingModel extends EmbeddingModel {
+  final inputs = <({String text, TaskType taskType})>[];
+
+  @override
+  int get dimension => 768;
+
+  @override
+  bool get isClosed => false;
+
+  @override
+  Future<List<double>> embed(
+    EmbeddingInput input, {
+    required TaskType taskType,
+  }) async {
+    final text = input.text!;
+    inputs.add((text: text, taskType: taskType));
+    if (text.length > 12) {
+      throw EmbeddingInputTooLongException(
+        'Input exceeds the embedding limit.',
+        maxInputTokens: 12,
+        actualTokens: text.length,
+      );
+    }
+    return List<double>.generate(768, (index) => index == 0 ? 1 : 0);
+  }
+
+  @override
+  void addCloseListener(void Function() listener) {}
+
+  @override
+  Future<void> close() async {}
 }

@@ -34,7 +34,23 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Offline Assistant',
-      theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.deepPurple)),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: AiChatTheme.brandColor)
+            .copyWith(
+              primary: AiChatTheme.brandColor,
+              onPrimary: AiChatTheme.textPrimary,
+              secondary: AiChatTheme.brandDark,
+              onSecondary: AiChatTheme.white,
+              surface: AiChatTheme.white,
+              onSurface: AiChatTheme.textPrimary,
+              onSurfaceVariant: AiChatTheme.textSecondary,
+              error: AiChatTheme.error,
+              onError: AiChatTheme.white,
+              tertiary: AiChatTheme.warning,
+            ),
+        scaffoldBackgroundColor: AiChatTheme.background,
+        fontFamily: 'ViessmannTT',
+      ),
       home: AiChatPage(
         modelManager: modelManager,
         askQuestion: askQuestion,

@@ -1,43 +1,51 @@
 import 'dart:io';
 
-import 'package:flutter_gemma_rag_sqlite/flutter_gemma_rag_sqlite.dart';
+import 'package:flutter_edge_ai_rag/flutter_edge_ai_rag.dart';
+import 'package:flutter_edge_ai_sqlite/flutter_edge_ai_sqlite.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('persists vectors and retrieves the closest document', () async {
     final path =
         '${Directory.systemTemp.path}/slm_ai_chatbot_rag_${DateTime.now().microsecondsSinceEpoch}.db';
-    final store = SqliteVectorStore();
+    final rag = FlutterEdgeAiRag(
+      providers: [const SqliteVectorStoreProvider()],
+    );
+    final store = await rag.openVectors(
+      spec: VectorStoreSpec(providerId: 'sqlite', location: path),
+      profile: EmbeddingProfile(id: 'test-vectors-v1', dimension: 3),
+    );
 
     try {
-      await store.initialize(path);
-      await store.addDocument(
+      await store.addVector(
         id: 'error-e123',
         content: 'The device failed to establish a network connection.',
         embedding: [1.0, 0.0, 0.0],
       );
-      await store.addDocument(
+      await store.addVector(
         id: 'error-e456',
         content: 'The temperature sensor is not responding.',
         embedding: [0.0, 1.0, 0.0],
       );
-      await store.addDocument(
+      await store.addVector(
         id: 'error-e789',
         content: 'The firmware update package is corrupted.',
         embedding: [0.0, 0.0, 1.0],
       );
-      await store.addDocument(
+      await store.addVector(
         id: 'error-e123',
         content: 'Updated network connection guidance.',
         embedding: [1.0, 0.0, 0.0],
       );
-      expect((await store.getStats()).documentCount, 3);
-      await store.close();
+      expect((await store.stats()).documentCount, 3);
+      await store.dispose();
 
-      final reopenedStore = SqliteVectorStore();
-      await reopenedStore.initialize(path);
-      final results = await reopenedStore.searchSimilar(
-        queryEmbedding: [1.0, 0.0, 0.0],
+      final reopenedStore = await rag.openVectors(
+        spec: VectorStoreSpec(providerId: 'sqlite', location: path),
+        profile: EmbeddingProfile(id: 'test-vectors-v1', dimension: 3),
+      );
+      final results = await reopenedStore.searchVector(
+        embedding: [1.0, 0.0, 0.0],
         topK: 1,
       );
 
@@ -45,9 +53,9 @@ void main() {
       expect(results.single.id, 'error-e123');
       expect(results.single.similarity, closeTo(1.0, 0.0001));
 
-      await reopenedStore.close();
+      await reopenedStore.dispose();
     } finally {
-      await store.close();
+      await store.dispose();
       final databaseFile = File(path);
       if (databaseFile.existsSync()) {
         databaseFile.deleteSync();

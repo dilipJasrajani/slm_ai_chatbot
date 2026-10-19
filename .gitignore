@@ -6,6 +6,7 @@
 *.swp
 .buildlog/
 .history
+.fvmrc
 
 
 
@@ -34,6 +35,7 @@ analysis_benchmark.json
 # Flutter/Dart/Pub related
 **/doc/api/
 .dart_tool/
+.fvm/
 .idea/
 .flutter-plugins
 .flutter-plugins-dependencies

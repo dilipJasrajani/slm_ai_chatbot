@@ -1,14 +1,14 @@
-import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
 
 /// Change [active] to select the inference model for the next app launch.
 enum LocalModelConfiguration {
-  gemma3(
-    fileName: 'gemma3-1b-it.litertlm',
-    label: 'Gemma 3 1B · Local',
-    modelType: ModelType.gemmaIt,
-    source: 'assets/models/gemma3-1b-it.litertlm',
-    bundledAsset: true,
-  ),
+  // gemma3(
+  //   fileName: 'gemma3-1b-it.litertlm',
+  //   label: 'Gemma 3 1B · Local',
+  //   modelType: ModelType.gemmaIt,
+  //   source: 'assets/models/gemma3-1b-it.litertlm',
+  //   bundledAsset: true,
+  // ),
   qwen3(
     fileName: 'Qwen3-0.6B.litertlm',
     label: 'Qwen3 0.6B · Local',

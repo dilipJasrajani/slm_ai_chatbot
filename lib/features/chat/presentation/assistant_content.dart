@@ -24,6 +24,7 @@ class AssistantContent extends StatelessWidget {
     final body = hostTheme.textTheme.bodyMedium?.copyWith(
       color: theme.assistantTextColor,
       height: 1.4,
+      fontSize: 14,
     );
     // Keep simple answers as Text; only parse answers with Markdown structure.
     if (!text.contains('\n\n') &&
@@ -259,9 +260,7 @@ class _CopyTextActionState extends State<CopyTextAction> {
       icon: Icon(icon),
       iconSize: 18,
       style: IconButton.styleFrom(
-        foregroundColor: widget.theme.backgroundTextColor.withValues(
-          alpha: .75,
-        ),
+        foregroundColor: widget.theme.secondaryTextColor,
         minimumSize: const Size(36, 36),
         padding: EdgeInsets.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,

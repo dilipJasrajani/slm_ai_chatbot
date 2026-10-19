@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show FlutterError;
 import 'package:flutter/services.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
-import 'package:flutter_gemma_rag_sqlite/flutter_gemma_rag_sqlite.dart';
+import 'package:flutter_edge_ai_rag/flutter_edge_ai_rag.dart';
+import 'package:flutter_edge_ai_sqlite/flutter_edge_ai_sqlite.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/rag/data/flutter_gemma_rag_sqlite_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/data/json_document_directory_source.dart';
@@ -111,8 +111,8 @@ void main() {
         'F.74 low pressure',
         jsonEncode(fallbackRecord),
       ]);
-      final stored = await runtime.store.searchSimilar(
-        queryEmbedding: [1, 0, 0],
+      final stored = await runtime.store.searchVector(
+        embedding: [1, 0, 0],
         topK: 2,
       );
       expect(
@@ -180,7 +180,7 @@ void main() {
     await _preparation(bundle, runtime, databasePath).index.prepare();
 
     expect(runtime.adds, 4);
-    expect((await runtime.store.getStats()).documentCount, 2);
+    expect((await runtime.store.stats()).documentCount, 2);
   });
 
   test(
@@ -193,7 +193,7 @@ void main() {
       await _preparation(bundle, runtime, databasePath).index.prepare();
 
       expect(runtime.adds, 2);
-      expect((await runtime.store.getStats()).documentCount, 1);
+      expect((await runtime.store.stats()).documentCount, 1);
     },
   );
 
@@ -293,7 +293,8 @@ class _AssetBundle extends CachingAssetBundle {
 }
 
 class _SqliteRuntime extends FlutterGemmaRagRuntime {
-  final store = SqliteVectorStore();
+  RagIndex? _store;
+  RagIndex get store => _store!;
   final embeddedTexts = <String>[];
   var adds = 0;
   var clears = 0;
@@ -306,10 +307,18 @@ class _SqliteRuntime extends FlutterGemmaRagRuntime {
   }
 
   @override
-  Future<void> initializeVectorStore(String path) => store.initialize(path);
+  Future<void> initializeVectorStore(String path) async {
+    _store =
+        await FlutterEdgeAiRag(
+          providers: [const SqliteVectorStoreProvider()],
+        ).openVectors(
+          spec: VectorStoreSpec(providerId: 'sqlite', location: path),
+          profile: EmbeddingProfile(id: 'test-embedding-v1', dimension: 3),
+        );
+  }
 
   @override
-  Future<VectorStoreStats> getVectorStoreStats() => store.getStats();
+  Future<VectorStoreStats> getVectorStoreStats() => store.stats();
 
   @override
   Future<void> clearVectorStore() async {
@@ -326,7 +335,7 @@ class _SqliteRuntime extends FlutterGemmaRagRuntime {
   }) async {
     adds++;
     if (adds == failOnAdd) throw StateError('Embedding failed.');
-    await store.addDocument(
+    await store.addVector(
       id: id,
       content: content,
       embedding: embedding,
@@ -341,5 +350,8 @@ class _SqliteRuntime extends FlutterGemmaRagRuntime {
     required double threshold,
   }) async => [];
 
-  Future<void> close() => store.close();
+  Future<void> close() async {
+    await _store?.dispose();
+    _store = null;
+  }
 }

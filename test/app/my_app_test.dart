@@ -9,7 +9,10 @@ import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_page.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_state.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/models/chat_message.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/widgets/chat_composer.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/widgets/chat_status_banners.dart';
 import 'package:slm_ai_chatbot/features/llm/domain/local_llm_service.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';
@@ -42,6 +45,41 @@ void main() {
     );
     expect(find.text('ViGuide AI'), findsOneWidget);
     expect(find.text('How can I help?'), findsOneWidget);
+    final appTheme = Theme.of(tester.element(find.byType(AiChatPage)));
+    expect(appTheme.colorScheme.primary, AiChatTheme.brandColor);
+    expect(appTheme.colorScheme.secondary, AiChatTheme.brandDark);
+    expect(appTheme.colorScheme.surface, AiChatTheme.white);
+    expect(appTheme.colorScheme.onSurface, AiChatTheme.textPrimary);
+    expect(appTheme.colorScheme.onSurfaceVariant, AiChatTheme.textSecondary);
+    expect(appTheme.colorScheme.error, AiChatTheme.error);
+    expect(appTheme.colorScheme.tertiary, AiChatTheme.warning);
+    expect(appTheme.textTheme.bodyMedium?.fontFamily, 'ViessmannTT');
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold)).backgroundColor,
+      AiChatTheme.background,
+    );
+    expect(
+      tester.widget<ActionChip>(find.byType(ActionChip).first).side?.color,
+      AiChatTheme.brandDark,
+    );
+    final sendButton = tester.widget<IconButton>(
+      find.byWidgetPredicate(
+        (widget) => widget is IconButton && widget.tooltip == 'Send message',
+      ),
+    );
+    expect(_sendButtonDecoration(tester).color, AiChatTheme.button);
+    expect(
+      tester
+          .widget<AnimatedContainer>(
+            find.descendant(
+              of: find.byType(SendButton),
+              matching: find.byType(AnimatedContainer),
+            ),
+          )
+          .duration,
+      const Duration(milliseconds: 150),
+    );
+    expect(sendButton.style?.foregroundColor?.resolve({}), AiChatTheme.white);
     expect(
       find.text('Ask a question using your local knowledge base.'),
       findsOneWidget,
@@ -712,6 +750,7 @@ void main() {
         chatConfiguration: const AiChatConfiguration(
           assistantName: 'Support AI',
           suggestions: ['Network connection help'],
+          showLocalSources: true,
         ),
         chatTheme: chatTheme,
         runtimeBackendLabel: () => 'GPU',
@@ -726,19 +765,7 @@ void main() {
     final chip = tester.widget<ActionChip>(find.byType(ActionChip));
     expect(chip.side?.color, Colors.teal);
     expect(chip.backgroundColor, Colors.white);
-    expect(
-      tester
-          .widget<IconButton>(
-            find.byWidgetPredicate(
-              (widget) =>
-                  widget is IconButton && widget.tooltip == 'Send message',
-            ),
-          )
-          .style!
-          .backgroundColor!
-          .resolve({}),
-      Colors.amber,
-    );
+    expect(_sendButtonDecoration(tester).color, Colors.amber);
     expect(
       (tester
                   .widget<TextField>(find.byType(TextField))
@@ -752,7 +779,7 @@ void main() {
     expect(find.text('Qwen3 0.6B · Local · GPU'), findsOneWidget);
     expect(
       tester.widget<Text>(find.text('Qwen3 0.6B · Local · GPU')).style?.color,
-      chatTheme.backgroundTextColor.withValues(alpha: .75),
+      chatTheme.secondaryTextColor,
     );
 
     await tester.tap(find.text('Network connection help'));
@@ -765,7 +792,7 @@ void main() {
     final assistantText = tester.widget<Text>(
       find.text('Check the connection.'),
     );
-    expect(userText.style?.color, const Color(0xFF1A1C20));
+    expect(userText.style?.color, AiChatTheme.textPrimary);
     expect(assistantText.style?.color, chatTheme.backgroundTextColor);
     final userBubble = tester
         .widgetList<Container>(
@@ -779,7 +806,7 @@ void main() {
     _expectNoAssistantDecoration(tester, find.text('Check the connection.'));
     expect(
       tester.widget<Text>(find.text('Sources · 1')).style?.color,
-      chatTheme.backgroundTextColor.withValues(alpha: .75),
+      chatTheme.secondaryTextColor,
     );
     expect(tester.takeException(), isNull);
     await modelManager.dispose();
@@ -1097,7 +1124,7 @@ void main() {
     expect(find.text('OK'), findsOneWidget);
     expect(
       tester.widget<Text>(find.text(prompt)).style?.color,
-      const Color(0xFF1A1C20),
+      AiChatTheme.textPrimary,
     );
     await modelManager.dispose();
   });
@@ -2300,7 +2327,7 @@ void main() {
     const configuration = AiChatConfiguration();
     const theme = AiChatTheme();
 
-    expect(configuration.showLocalSources, isTrue);
+    expect(configuration.showLocalSources, isFalse);
     expect(configuration.sourceSectionLabel, 'Sources');
     expect(configuration.modelLabel, 'Qwen3 0.6B · Local');
     expect(configuration.showModelLabel, isTrue);
@@ -2331,22 +2358,37 @@ void main() {
       isFalse,
     );
     expect(theme.avatarLabel, 'AI');
-    expect(theme.primaryColor, const Color(0xFFCC2C08));
-    expect(theme.assistantBubbleColor, const Color(0xFFF1F3F8));
-    expect(theme.userBubbleColor, theme.primaryColor);
-    expect(theme.userTextColor, Colors.white);
-    expect(theme.assistantTextColor, const Color(0xFF1A1C20));
+    expect(theme.primaryColor, AiChatTheme.brandColor);
+    expect(theme.accentColor, AiChatTheme.brandDark);
+    expect(theme.backgroundColor, AiChatTheme.background);
+    expect(theme.surfaceColor, AiChatTheme.white);
+    expect(theme.assistantBubbleColor, AiChatTheme.white);
+    expect(theme.userBubbleColor, theme.accentColor);
+    expect(theme.userTextColor, AiChatTheme.white);
+    expect(theme.buttonColor, AiChatTheme.button);
+    expect(theme.buttonTextColor, AiChatTheme.white);
+    expect(theme.assistantTextColor, AiChatTheme.textPrimary);
+    expect(theme.secondaryTextColor, AiChatTheme.textSecondary);
+    expect(theme.borderColor, AiChatTheme.textSecondary.withValues(alpha: .35));
     expect(
       const AiChatTheme(primaryColor: Colors.yellow).userTextColor,
-      const Color(0xFF1A1C20),
+      AiChatTheme.white,
     );
     expect(
       const AiChatTheme(assistantBubbleColor: Colors.black).assistantTextColor,
-      const Color(0xFF1A1C20),
+      AiChatTheme.textPrimary,
     );
     expect(
       const AiChatTheme(userTextColor: Colors.blue).userTextColor,
       Colors.blue,
+    );
+    expect(
+      const AiChatTheme(primaryColor: Colors.amber).buttonColor,
+      Colors.amber,
+    );
+    expect(
+      const AiChatTheme(buttonColor: Colors.black).buttonTextColor,
+      Colors.white,
     );
     final dark = const AiChatTheme(
       primaryColor: Colors.amber,
@@ -2354,14 +2396,189 @@ void main() {
     ).resolve(ThemeData.dark().colorScheme);
     expect(dark.backgroundColor, ThemeData.dark().colorScheme.surface);
     expect(dark.primaryColor, Colors.amber);
-    expect(dark.userTextColor, const Color(0xFF1A1C20));
+    expect(dark.userTextColor, AiChatTheme.textPrimary);
     expect(dark.assistantTextColor, Colors.white);
+    expect(dark.secondaryTextColor, Colors.white.withValues(alpha: .75));
     expect(
       const AiChatTheme(assistantTextColor: Colors.blue).assistantTextColor,
       Colors.blue,
     );
   });
+
+  testWidgets('model and knowledge status use warning and error colors', (
+    tester,
+  ) async {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AiChatTheme.brandColor,
+    ).copyWith(error: AiChatTheme.error, tertiary: AiChatTheme.warning);
+    const chatTheme = AiChatTheme();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorScheme: scheme),
+        home: Scaffold(
+          body: Column(
+            children: [
+              ModelStatusBanner(
+                state: const ModelState.downloading(25),
+                theme: chatTheme,
+                showRetryAction: true,
+                onRetry: () {},
+              ),
+              const KnowledgeStatusBanner(
+                state: ChatState(modelState: ModelState.ready()),
+                theme: chatTheme,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester
+          .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
+          .color,
+      AiChatTheme.warning,
+    );
+    expect(
+      tester
+          .widget<Container>(
+            find.descendant(
+              of: find.byType(ModelStatusBanner),
+              matching: find.byType(Container),
+            ),
+          )
+          .color,
+      AiChatTheme.warning.withValues(alpha: .10),
+    );
+    expect(
+      tester
+          .widget<Container>(
+            find.descendant(
+              of: find.byType(KnowledgeStatusBanner),
+              matching: find.byType(Container),
+            ),
+          )
+          .color,
+      AiChatTheme.warning.withValues(alpha: .10),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorScheme: scheme),
+        home: Scaffold(
+          body: Column(
+            children: [
+              ModelStatusBanner(
+                state: const ModelState.error('failed'),
+                theme: chatTheme,
+                showRetryAction: true,
+                onRetry: () {},
+              ),
+              const KnowledgeStatusBanner(
+                state: ChatState(
+                  modelState: ModelState.ready(),
+                  knowledgeError: 'Failed to prepare knowledge',
+                ),
+                theme: chatTheme,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester
+          .widget<TextButton>(find.byType(TextButton))
+          .style
+          ?.foregroundColor
+          ?.resolve({}),
+      AiChatTheme.error,
+    );
+    expect(
+      tester
+          .widget<Container>(
+            find.descendant(
+              of: find.byType(ModelStatusBanner),
+              matching: find.byType(Container),
+            ),
+          )
+          .color,
+      AiChatTheme.error.withValues(alpha: .10),
+    );
+    expect(
+      tester
+          .widget<Container>(
+            find.descendant(
+              of: find.byType(KnowledgeStatusBanner),
+              matching: find.byType(Container),
+            ),
+          )
+          .color,
+      AiChatTheme.error.withValues(alpha: .10),
+    );
+  });
+
+  testWidgets(
+    'composer uses custom button colors and respects disabled state',
+    (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      var sends = 0;
+      Widget composer(bool enabled) => MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            enabled: enabled,
+            onSend: () => sends++,
+            theme: const AiChatTheme(buttonColor: Colors.black),
+            modelLabel: null,
+            runtimeBackend: null,
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(composer(true));
+      IconButton sendButton() => tester.widget<IconButton>(
+        find.byWidgetPredicate(
+          (widget) => widget is IconButton && widget.tooltip == 'Send message',
+        ),
+      );
+      expect(_sendButtonDecoration(tester).color, Colors.black);
+      expect(sendButton().style?.foregroundColor?.resolve({}), Colors.white);
+      expect(
+        (tester
+                    .widget<TextField>(find.byType(TextField))
+                    .decoration!
+                    .focusedBorder!
+                as OutlineInputBorder)
+            .borderSide
+            .color,
+        Colors.black,
+      );
+      await tester.tap(find.byTooltip('Send message'));
+      expect(sends, 1);
+
+      await tester.pumpWidget(composer(false));
+      expect(sendButton().onPressed, isNull);
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(
+        _sendButtonDecoration(tester).color,
+        AiChatTheme.textSecondary.withValues(alpha: .12),
+      );
+    },
+  );
 }
+
+BoxDecoration _sendButtonDecoration(WidgetTester tester) =>
+    tester
+            .widget<AnimatedContainer>(
+              find.descendant(
+                of: find.byType(SendButton),
+                matching: find.byType(AnimatedContainer),
+              ),
+            )
+            .decoration!
+        as BoxDecoration;
 
 void _expectNoAssistantDecoration(WidgetTester tester, Finder content) {
   final decoratedAncestors = tester
