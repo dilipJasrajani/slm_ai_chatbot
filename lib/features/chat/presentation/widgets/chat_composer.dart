@@ -121,43 +121,62 @@ class ChatComposer extends StatelessWidget {
 
   Widget _buildSuggestions(BuildContext context) {
     return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var index = 0; index < suggestions.length; index++) ...[
-              if (index > 0) SizedBox(width: theme.spacing * .5),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: constraints.maxWidth * .85,
-                ),
-                child: ActionChip(
-                  shape: const StadiumBorder(),
-                  label: Text(
-                    suggestions[index],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: enabled
-                          ? theme.surfaceColor
-                          : theme.backgroundColor.withValues(alpha: .6),
+      builder: (context, constraints) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .3,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var index = 0; index < suggestions.length; index++) ...[
+                if (index > 0) SizedBox(height: theme.spacing * .5),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: constraints.maxWidth * .75,
+                    ),
+                    child: ActionChip(
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                      label: Text(
+                        suggestions[index],
+                        softWrap: true,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: enabled
+                              ? theme.userTextColor
+                              : theme.userTextColor.withValues(alpha: .6),
+                        ),
+                      ),
+                      tooltip: suggestions[index],
+                      backgroundColor: theme.userBubbleColor,
+                      side: BorderSide(color: theme.userBubbleColor),
+                      labelStyle: Theme.of(context).textTheme.labelLarge
+                          ?.copyWith(
+                            color: enabled
+                                ? theme.surfaceTextColor
+                                : theme.surfaceTextColor.withValues(alpha: .6),
+                          ),
+                      onPressed: enabled && onSuggestion != null
+                          ? () => onSuggestion!(suggestions[index])
+                          : null,
                     ),
                   ),
-                  tooltip: suggestions[index],
-                  backgroundColor: theme.accentColor,
-                  side: BorderSide(color: theme.accentColor),
-                  labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: enabled
-                        ? theme.surfaceTextColor
-                        : theme.surfaceTextColor.withValues(alpha: .6),
-                  ),
-                  onPressed: enabled && onSuggestion != null
-                      ? () => onSuggestion!(suggestions[index])
-                      : null,
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -18,7 +18,7 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
 
   Future<InferenceModel> get loadedModel async {
     return _loadedModel ??= await FlutterEdgeAi.getActiveModel(
-      maxTokens: 1024 * 20,
+      maxTokens: 1024 * 100,
     );
   }
 

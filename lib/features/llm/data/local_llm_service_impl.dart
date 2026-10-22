@@ -32,8 +32,8 @@ class LocalLlmServiceImpl implements LocalLlmService {
       profile.backend = model.activeBackend?.name.toUpperCase() ?? 'UNKNOWN';
     }
     final session = await model.createSession(
-      temperature: 1.0,
-      topK: 64,
+      temperature: 0.8,
+      topK: 3,
       topP: 0.95,
       enableThinking: true,
     );
