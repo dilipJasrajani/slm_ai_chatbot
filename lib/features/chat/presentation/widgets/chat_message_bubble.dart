@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:slm_ai_chatbot/features/rag/domain/knowledge_document.dart';
+import 'package:slm_ai_chatbot/features/rag/domain/knowledge_identifier_normalizer.dart';
 
 import '../ai_chat_configuration.dart';
 import '../assistant_content.dart';
 import '../models/chat_message.dart';
+import 'source_fault_instructions.dart';
 
 /// Renders one user or assistant message, including its available actions.
 class ChatMessageBubble extends StatelessWidget {
@@ -87,14 +89,18 @@ class ChatMessageBubble extends StatelessWidget {
         ? AssistantContent(text: message.text, theme: theme)
         : Text(
             message.text,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: textColor, height: 1.4, fontSize: 16),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: textColor,
+              height: 1.4,
+              fontSize: 16,
+            ),
           );
     final content = Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * (isUser ? 0.75 : 0.88)),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * (isUser ? 0.75 : 0.88),
+        ),
         child: Padding(
           padding: EdgeInsets.only(bottom: theme.spacing * .75),
           child: Row(
@@ -117,6 +123,16 @@ class ChatMessageBubble extends StatelessWidget {
                       ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
+                    if (!isUser &&
+                        message.sources.any(
+                          (source) => const KnowledgeIdentifierNormalizer()
+                              .documentIdentifiers(source)
+                              .isNotEmpty,
+                        ))
+                      SourceFaultInstructions(
+                        documents: message.sources,
+                        theme: theme,
+                      ),
                     Semantics(
                       label: isUser ? 'Your message' : 'Assistant message',
                       child: isUser
@@ -127,14 +143,17 @@ class ChatMessageBubble extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: theme.userBubbleColor,
-                                borderRadius: BorderRadius
-                                    .only(topLeft: Radius.circular(16),
-                                topRight: Radius.circular(16),
-                                bottomLeft: Radius.circular(16),
-                                bottomRight: Radius.circular(4),),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(16),
+                                  topRight: Radius.circular(16),
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(4),
+                                ),
                                 border: Border.all(
                                   color: message.isError
-                                      ? theme.primaryColor.withValues(alpha: .65)
+                                      ? theme.primaryColor.withValues(
+                                          alpha: .65,
+                                        )
                                       : theme.borderColor,
                                 ),
                               ),
@@ -173,14 +192,17 @@ class ChatMessageBubble extends StatelessWidget {
                             if (showRegenerate)
                               IconButton(
                                 tooltip: 'Regenerate response',
-                                onPressed: regenerateEnabled ? onRegenerate : null,
+                                onPressed: regenerateEnabled
+                                    ? onRegenerate
+                                    : null,
                                 icon: const Icon(Icons.refresh),
                                 iconSize: 18,
                                 style: IconButton.styleFrom(
                                   foregroundColor: theme.secondaryTextColor,
                                   minimumSize: const Size(36, 36),
                                   padding: EdgeInsets.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
                           ],

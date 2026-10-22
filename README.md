@@ -44,10 +44,24 @@ source pages rather than repeating the stored JSON, retrieval phrasings, and
 metadata in the model prompt. Unknown records without either field keep their
 other fields as answer context. It sends at most two semantic matches to the
 answer model, while retaining all fault codes explicitly requested by the user.
-Grounded answers are prompted to use relevant sections in this order: Cause,
-System behavior, Recommended steps, Additional details. Unsupported sections
-are omitted. Since answers stream directly from a local language model, this
-format is requested by the prompt rather than guaranteed by an output validator.
+Search and grounded generation use the same deterministically resolved question,
+not the full conversation. Explicit fault codes override older subjects and
+restrict evidence to matching records; missing codes return an insufficient-
+knowledge response without calling the answer model. Comparisons retain separate
+records for each requested code. Follow-ups use the nearest relevant user-authored
+subject, never generated assistant facts; multiple plausible faults require
+clarification. Questions without codes retain semantic ranking and grounding.
+
+Grounded prompts omit conversation history and instruct the model not to transfer
+facts between faults. Fault records are also displayed as plain, selectable source
+text in a collapsed-by-default, expandable section above the separately labelled
+AI explanation, even when optional source titles are hidden or generation fails.
+Expand this section to read original warnings and corrective measures.
+Source warnings, conditions, and measures must not
+be replaced by a generated summary. Model explanations remain probabilistic.
+Debug-only chat diagnostics report bounded current/resolved questions, target
+codes, retrieved IDs and scores, selected IDs, and history inclusion; production
+builds do not emit these diagnostics.
 The app saves a fingerprint of the bundled JSON and embedding model alongside
 the SQLite database. On later launches it opens the existing index and
 restores exact-code lookup without re-embedding documents. Editing the KB,

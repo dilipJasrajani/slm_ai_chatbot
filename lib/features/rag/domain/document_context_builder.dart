@@ -101,6 +101,8 @@ class DocumentContextBuilder {
       '',
       'Content:',
       factualContent,
+      if (document.measures case final String measures)
+        if (!factualContent.contains(measures)) ...['', 'Measures:', measures],
       if (additionalFacts.isNotEmpty)
         'Additional facts: ${jsonEncode(additionalFacts)}',
       if (pages is List && pages.isNotEmpty)

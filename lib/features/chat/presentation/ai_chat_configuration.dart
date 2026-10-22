@@ -116,8 +116,8 @@ class AiChatTheme {
 @immutable
 class AiChatConfiguration {
   const AiChatConfiguration({
-    this.title = 'Offline Assistant',
-    this.assistantName = 'ViGuide AI',
+    this.title = 'ViSage AI',
+    this.assistantName = 'ViSage AI',
     this.assistantAvatar,
     this.welcomeTitle = 'How can I help?',
     this.welcomeMessage = 'Ask a question using your local knowledge base.',
@@ -129,7 +129,7 @@ class AiChatConfiguration {
         "I'm an AI assistant designed to help with technical information "
         "available in my knowledge base. I can't answer that question.",
     this.suggestions = const [
-      'What does error F.94 mean?',
+      'What does error F.425 mean?',
       'How do I troubleshoot a Communication error PlusBus?',
     ],
     this.showLocalSources = false,

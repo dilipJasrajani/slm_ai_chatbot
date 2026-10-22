@@ -86,6 +86,44 @@ void main() {
     }
   });
 
+  test(
+    'explicit identifiers override lexical overlap and prose references',
+    () {
+      const unrelated = KnowledgeDocument(
+        id: 'error-e456',
+        title: 'Network connection error',
+        content: 'Network connection error; see also E123.',
+        metadata: {'code': 'E456'},
+      );
+      final hits = [
+        ...results,
+        const RagSearchResult(document: unrelated, similarity: 1),
+      ];
+      expect(
+        relevance
+            .relevantDocuments(
+              question: 'E123 network connection error',
+              results: hits,
+            )
+            .map((doc) => doc.id),
+        ['error-e123'],
+      );
+      expect(
+        relevance.relevantDocuments(question: 'E999', results: hits),
+        isEmpty,
+      );
+      expect(
+        relevance
+            .relevantDocuments(
+              question: 'Compare E123 and E456',
+              results: results,
+            )
+            .map((doc) => doc.id),
+        ['error-e123', 'error-e456'],
+      );
+    },
+  );
+
   test('uses search-only phrasings to ground paraphrases', () {
     const document = KnowledgeDocument(
       id: 'card:msg:f_74',

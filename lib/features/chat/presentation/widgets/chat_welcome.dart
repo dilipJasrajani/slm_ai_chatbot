@@ -3,20 +3,16 @@ import 'package:flutter/material.dart';
 import '../ai_chat_configuration.dart';
 import 'ai_avatar.dart';
 
-/// Displays the empty-conversation welcome state and suggested questions.
+/// Displays the empty-conversation welcome state.
 class ChatWelcome extends StatelessWidget {
   const ChatWelcome({
     required this.configuration,
     required this.theme,
-    required this.enabled,
-    required this.onSuggestion,
     super.key,
   });
 
   final AiChatConfiguration configuration;
   final AiChatTheme theme;
-  final bool enabled;
-  final ValueChanged<String> onSuggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -61,40 +57,6 @@ class ChatWelcome extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: theme.backgroundTextColor,
-                  ),
-                ),
-              ],
-              if (configuration.suggestions.isNotEmpty) ...[
-                SizedBox(height: theme.spacing),
-                LayoutBuilder(
-                  builder: (context, constraints) => Wrap(
-                    spacing: theme.spacing * .5,
-                    runSpacing: theme.spacing * .5,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      for (final suggestion in configuration.suggestions)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: constraints.maxWidth,
-                          ),
-                          child: ActionChip(
-                            label: Text(suggestion, softWrap: true),
-                            backgroundColor: theme.surfaceColor,
-                            side: BorderSide(color: theme.accentColor),
-                            labelStyle: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: enabled
-                                      ? theme.surfaceTextColor
-                                      : theme.surfaceTextColor.withValues(
-                                          alpha: .6,
-                                        ),
-                                ),
-                            onPressed: enabled
-                                ? () => onSuggestion(suggestion)
-                                : null,
-                          ),
-                        ),
-                    ],
                   ),
                 ),
               ],

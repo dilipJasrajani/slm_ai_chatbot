@@ -6,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/ask_question_use_case.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_history.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_page.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/widgets/chat_composer.dart';
+import 'package:slm_ai_chatbot/features/chat/presentation/widgets/chat_welcome.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/cubit/chat_state.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/models/chat_message.dart';
@@ -19,6 +22,66 @@ import 'package:slm_ai_chatbot/features/rag/domain/rag_repository.dart';
 import 'package:slm_ai_chatbot/features/rag/domain/rag_search_result.dart';
 
 void main() {
+  testWidgets(
+    'suggestions sit above input, send once, and return after clear',
+    (tester) async {
+      final manager = LocalModelManager(_ReadyModelRepository());
+      await manager.ensureReady();
+      final llm = _LlmService(Stream.value('Here is help.'));
+      final cubit = ChatCubit(
+        modelManager: manager,
+        askQuestion: AskQuestionUseCase(
+          ragRepository: _RagRepository(),
+          llmService: llm,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AiChatPage(
+            modelManager: manager,
+            askQuestion: AskQuestionUseCase(
+              ragRepository: _RagRepository(),
+              llmService: llm,
+            ),
+            cubit: cubit,
+            configuration: const AiChatConfiguration(
+              suggestions: ['Need help'],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(ChatComposer),
+          matching: find.byType(ActionChip),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(ChatWelcome),
+          matching: find.byType(ActionChip),
+        ),
+        findsNothing,
+      );
+      await tester.tap(find.text('Need help'));
+      await tester.pumpAndSettle();
+      expect(llm.generateCalls, 1);
+      expect(cubit.state.messages.first.text, 'Need help');
+      expect(find.text('Suggestions'), findsNothing);
+      expect(find.byType(ActionChip), findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.tap(find.byTooltip('Clear conversation'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ActionChip), findsOneWidget);
+      expect(find.text('Suggestions'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(cubit.close);
+      await manager.dispose();
+    },
+  );
+
   test(
     'emits every state in order while state changes synchronously',
     () async {
@@ -79,8 +142,12 @@ void main() {
         false,
       ]);
       expect(identical(states[1], states[2]), isFalse);
+      expect(states.first.messages.last.sources, isEmpty);
       expect(
-        states.take(4).every((state) => state.messages.last.sources.isEmpty),
+        states
+            .skip(1)
+            .take(3)
+            .every((state) => state.messages.last.sources.length == 1),
         isTrue,
       );
       expect(states[4].messages.last.sources, hasLength(1));
@@ -561,14 +628,14 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(controller.state.messages.last.text, 'Part ');
     expect(controller.state.messages.last.isStreaming, isTrue);
-    expect(controller.state.messages.last.sources, isEmpty);
+    expect(controller.state.messages.last.sources, hasLength(1));
     expect(controller.state.messages.last.generationDuration, isNull);
 
     response.addError(Exception('failed'));
     await send;
     expect(controller.state.isTyping, isFalse);
     expect(controller.state.messages.last.isError, isTrue);
-    expect(controller.state.messages.last.sources, isEmpty);
+    expect(controller.state.messages.last.sources, hasLength(1));
     expect(controller.state.messages.last.generationDuration, isNull);
     expect(
       controller.state.messages.last.text,
@@ -580,39 +647,42 @@ void main() {
     await modelManager.dispose();
   });
 
-  test('attaches grounded documents only when the answer finishes', () async {
-    final modelManager = LocalModelManager(_ReadyModelRepository());
-    await modelManager.ensureReady();
-    final response = StreamController<String>();
-    final controller = ChatCubit(
-      modelManager: modelManager,
-      askQuestion: AskQuestionUseCase(
-        ragRepository: _RagRepository(),
-        llmService: _LlmService(response.stream),
-      ),
-    );
+  test(
+    'keeps source instructions available during and after generation',
+    () async {
+      final modelManager = LocalModelManager(_ReadyModelRepository());
+      await modelManager.ensureReady();
+      final response = StreamController<String>();
+      final controller = ChatCubit(
+        modelManager: modelManager,
+        askQuestion: AskQuestionUseCase(
+          ragRepository: _RagRepository(),
+          llmService: _LlmService(response.stream),
+        ),
+      );
 
-    final send = controller.send('Need help');
-    response.add('Part ');
-    await Future<void>.delayed(Duration.zero);
-    expect(controller.state.messages.last.sources, isEmpty);
-    expect(controller.state.messages.last.generationDuration, isNull);
-    expect(controller.state.messages.first.sources, isEmpty);
+      final send = controller.send('Need help');
+      response.add('Part ');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.messages.last.sources, hasLength(1));
+      expect(controller.state.messages.last.generationDuration, isNull);
+      expect(controller.state.messages.first.sources, isEmpty);
 
-    await response.close();
-    await send;
-    expect(controller.state.messages.last.isStreaming, isFalse);
-    expect(
-      controller.state.messages.last.sources.single.title,
-      'Need help guide',
-    );
-    expect(controller.state.messages.first.sources, isEmpty);
-    expect(controller.state.messages.last.generationDuration, isNotNull);
-    expect(controller.state.messages.first.generationDuration, isNull);
+      await response.close();
+      await send;
+      expect(controller.state.messages.last.isStreaming, isFalse);
+      expect(
+        controller.state.messages.last.sources.single.title,
+        'Need help guide',
+      );
+      expect(controller.state.messages.first.sources, isEmpty);
+      expect(controller.state.messages.last.generationDuration, isNotNull);
+      expect(controller.state.messages.first.generationDuration, isNull);
 
-    await controller.close();
-    await modelManager.dispose();
-  });
+      await controller.close();
+      await modelManager.dispose();
+    },
+  );
 
   test('keeps timing attached to each completed assistant message', () async {
     final modelManager = LocalModelManager(_ReadyModelRepository());
@@ -845,7 +915,7 @@ void main() {
         controller.state.messages.last.text,
         'Unable to generate an answer with the local AI model.',
       );
-      expect(controller.state.messages.last.sources, isEmpty);
+      expect(controller.state.messages.last.sources, hasLength(1));
       expect(controller.state.messages.last.generationDuration, isNull);
       expect(history.messages, isEmpty);
 

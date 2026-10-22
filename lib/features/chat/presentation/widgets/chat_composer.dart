@@ -11,6 +11,8 @@ class ChatComposer extends StatelessWidget {
     required this.theme,
     required this.modelLabel,
     required this.runtimeBackend,
+    this.suggestions = const [],
+    this.onSuggestion,
     super.key,
   });
 
@@ -20,6 +22,8 @@ class ChatComposer extends StatelessWidget {
   final AiChatTheme theme;
   final String? modelLabel;
   final String? runtimeBackend;
+  final List<String> suggestions;
+  final ValueChanged<String>? onSuggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -29,51 +33,76 @@ class ChatComposer extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  enabled: enabled,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: theme.inputTextColor),
-                  cursorColor: theme.buttonColor,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onSend(),
-                  decoration: InputDecoration(
-                    labelText: 'Ask a question',
-                    labelStyle: TextStyle(color: theme.secondaryTextColor),
-                    floatingLabelStyle: TextStyle(color: theme.buttonColor),
-                    filled: true,
-                    fillColor: theme.inputBackgroundColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
-                      borderSide: BorderSide(color: theme.borderColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
-                      borderSide: BorderSide(color: theme.borderColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
-                      borderSide: BorderSide(
-                        color: theme.buttonColor,
-                        width: 2,
-                      ),
+          if (suggestions.isNotEmpty) ...[
+            _buildSuggestions(context),
+            SizedBox(height: theme.spacing * .75),
+          ],
+          Focus(
+            child: Builder(
+              builder: (context) {
+                final focused = Focus.of(context).hasFocus;
+                return Container(
+                  key: const ValueKey('chat-input-panel'),
+                  padding: EdgeInsets.all(theme.spacing * .75),
+                  decoration: BoxDecoration(
+                    color: theme.inputBackgroundColor,
+                    borderRadius: BorderRadius.circular(theme.bubbleRadius),
+                    border: Border.all(
+                      color: focused ? theme.buttonColor : theme.borderColor,
+                      width: focused ? 2 : 1,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SendButton(enabled: enabled, onPressed: onSend, theme: theme),
-            ],
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: controller,
+                              enabled: enabled,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: theme.inputTextColor),
+                              cursorColor: theme.buttonColor,
+                              minLines: 1,
+                              maxLines: 4,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => onSend(),
+                              decoration: InputDecoration(
+                                labelText: 'Ask a question',
+                                labelStyle: TextStyle(
+                                  color: theme.secondaryTextColor,
+                                ),
+                                floatingLabelStyle: TextStyle(
+                                  color: theme.buttonColor,
+                                ),
+                                filled: true,
+                                fillColor: theme.inputBackgroundColor,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SendButton(
+                            enabled: enabled,
+                            onPressed: onSend,
+                            theme: theme,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
           if (modelLabel != null)
             Padding(
-              padding: EdgeInsets.only(top: theme.spacing * .4),
+              padding: EdgeInsets.only(top: theme.spacing * .4, left: 12),
               child: Text(
                 runtimeBackend == null
                     ? modelLabel!
@@ -86,6 +115,50 @@ class ChatComposer extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestions(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (var index = 0; index < suggestions.length; index++) ...[
+              if (index > 0) SizedBox(width: theme.spacing * .5),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * .85,
+                ),
+                child: ActionChip(
+                  shape: const StadiumBorder(),
+                  label: Text(
+                    suggestions[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: enabled
+                          ? theme.surfaceColor
+                          : theme.backgroundColor.withValues(alpha: .6),
+                    ),
+                  ),
+                  tooltip: suggestions[index],
+                  backgroundColor: theme.accentColor,
+                  side: BorderSide(color: theme.accentColor),
+                  labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: enabled
+                        ? theme.surfaceTextColor
+                        : theme.surfaceTextColor.withValues(alpha: .6),
+                  ),
+                  onPressed: enabled && onSuggestion != null
+                      ? () => onSuggestion!(suggestions[index])
+                      : null,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -139,11 +212,8 @@ class SendButton extends StatelessWidget {
                 child: TweenAnimationBuilder<Color?>(
                   duration: _duration,
                   tween: ColorTween(end: fg),
-                  builder: (_, color, __) => Icon(
-                    Icons.arrow_upward_rounded,
-                    size: 24,
-                    color: color,
-                  ),
+                  builder: (_, color, __) =>
+                      Icon(Icons.arrow_upward_rounded, size: 24, color: color),
                 ),
               ),
             ),

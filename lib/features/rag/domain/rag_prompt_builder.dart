@@ -1,27 +1,40 @@
-import 'package:slm_ai_chatbot/features/chat/domain/conversation_context_builder.dart';
 import 'package:slm_ai_chatbot/features/chat/domain/conversation_message.dart';
+import 'package:slm_ai_chatbot/features/chat/domain/conversation_context_builder.dart';
+import 'knowledge_identifier_normalizer.dart';
 
-/// Combines question, grounded context, and supported history into the prompt.
+/// Formats an already-resolved question and selected factual records.
 class RagPromptBuilder {
   const RagPromptBuilder({
     ConversationContextBuilder contextBuilder =
         const ConversationContextBuilder(),
-  }) : _contextBuilder = contextBuilder;
-
-  final ConversationContextBuilder _contextBuilder;
+  });
 
   String build({
     required String question,
     required String context,
     List<ConversationMessage> history = const [],
   }) {
-    return
-    '''
+    final identifiers = const KnowledgeIdentifierNormalizer().extractFaultCodes(
+      question,
+    );
+    return '''
 You are a technical knowledge assistant.
 
 Answer the user's question using the provided knowledge.
 
 Rules:
+- Output only the user-facing answer in plain text or Markdown.
+- The target_fault_codes, knowledge, and current_user_question tags are input delimiters only. Never include their opening or closing tags, repeat the input blocks, or wrap your answer in XML/HTML tags.
+- Prioritize the current question. If it names a different fault, treat it as a new case.
+- Do not carry over a previous diagnosis. Previous assistant answers are not technical evidence.
+- Never combine causes, symptoms, or repair steps from different fault codes.
+- Keep each requested fault in a separate labelled section, including in comparisons.
+- Recommend a repair or replacement only when the selected record explicitly supports it.
+- Preserve conditions, warnings, qualification requirements, and safety instructions without weakening or omitting them.
+- The original source instructions are displayed separately; any explanation must agree with them.
+- If product applicability is ambiguous, ask for the exact product/model and error code.
+- For follow-ups, answer only what is asked; do not repeat the earlier answer unless requested.
+- If a requested detail is missing, say it is unavailable and provide supported parts.
 - Use the provided knowledge as the primary and authoritative source.
 - Do not invent, assume, or add facts that are not supported by the provided knowledge.
 - Do not change, reinterpret, or expand the meaning of the provided knowledge.
@@ -34,16 +47,16 @@ Rules:
 - You may use Markdown formatting to make the answer easier to read.
 - Use Markdown only for presentation and readability; Markdown must not change or add any information.
 - Use appropriate Markdown formatting when helpful, such as:
-  - **bold** for important terms
+  - In a recommended step, bold at most one item, once: the action verb or key part name. Do not bold the whole bullet.
   - bullet lists for multiple items
   - numbered lists for ordered steps or procedures
   - headings for clearly separated sections
   - `inline code` for error codes, commands, identifiers, or technical values.
 - Preserve all factual information according to the provided knowledge.
 
-<conversation_history>
-${_contextBuilder.build(history)}
-</conversation_history>
+<target_fault_codes>
+${identifiers.join(', ')}
+</target_fault_codes>
 
 <knowledge>
 $context
@@ -53,45 +66,9 @@ $context
 $question
 </current_user_question>
 
+Return only the answer. Do not output any input delimiter tags.
+
 Answer:
-''' ;
+''';
   }
 }
-
-
-//return '''
-// You are a technical knowledge assistant.
-//
-// Answer the user's question using the provided knowledge.
-//
-// Rules:
-// - Use the provided knowledge as the primary and authoritative source.
-// - Do not invent, assume, or add facts that are not supported by the provided knowledge.
-// - Do not change, reinterpret, or expand the meaning of the provided knowledge.
-// - If the user asks for more details, explain the relevant information from the knowledge in more detail.
-// - Keep the answer focused on the user's question. Include all relevant supported causes and steps without inventing additional ones.
-// - For a grounded answer, use only these exact Markdown formatting, in this order:
-//   ### **Cause**
-//   ### **System behavior**
-//   ### **Recommended steps**
-//   ### **Additional details**
-// - Include a heading only when it is relevant to the question AND the provided knowledge supports content for it. Omit unsupported or irrelevant sections entirely; do not add placeholder headings.
-// - Under Cause, explain the documented reason or fault. Under System behavior, describe documented symptoms or effects. Under Recommended steps, give documented actions in their correct order, using a numbered list only when order matters. Under Additional details, give other relevant documented measurements, conditions, or source pages.
-// - Start directly with the first applicable heading. Do not add an introduction, conclusion, other headings, or unstructured text outside the sections.
-// - Answer from the supported facts first. If the provided knowledge does not cover a specific requested detail, briefly identify that missing detail without guessing; do not replace the supported answer with a generic unavailable message.
-// - Use Markdown only for readability; do not change or add facts.
-//
-// <conversation_history>
-// ${_contextBuilder.build(history)}
-// </conversation_history>
-//
-// <knowledge>
-// $context
-// </knowledge>
-//
-// <current_user_question>
-// $question
-// </current_user_question>
-//
-// Answer:
-// ''';

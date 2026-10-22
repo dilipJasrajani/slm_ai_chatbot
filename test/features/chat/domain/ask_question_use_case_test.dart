@@ -253,10 +253,8 @@ void main() {
       final result = await useCase('How can I fix it?');
 
       expect(result.status, QuestionAnswerStatus.answered);
-      expect(ragRepository.query, '''
-User: What does E123 mean?
-Assistant: E123 is a network connection error.
-User: How can I fix it?''');
+      expect(ragRepository.query, 'How can I fix fault E123?');
+      expect(ragRepository.exactMatchQuery, ragRepository.query);
     },
   );
 
@@ -291,7 +289,7 @@ User: How can I fix it?''');
 
     final result = await useCase('What is the capital of France?');
 
-    expect(ragRepository.query, contains('What does F838 mean?'));
+    expect(ragRepository.query, 'What is the capital of France?');
     expect(ragRepository.exactMatchQuery, 'What is the capital of France?');
     expect(result.documents, isEmpty);
   });
@@ -627,7 +625,7 @@ User: How can I fix it?''');
     await useCase('How are you?');
 
     expect(ragRepository.query, contains('How are you?'));
-    expect(ragRepository.query, contains('Hi there.'));
+    expect(ragRepository.query, isNot(contains('Hi there.')));
     expect(
       llmService.prompt,
       allOf(contains('Hello'), contains('How are you?')),
@@ -654,10 +652,8 @@ User: How can I fix it?''');
       final result = await useCase('Why can my device not connect to network?');
 
       expect(result.status, QuestionAnswerStatus.answered);
-      expect(
-        llmService.prompt,
-        allOf(contains('<knowledge>'), contains('<conversation_history>')),
-      );
+      expect(llmService.prompt, contains('<knowledge>'));
+      expect(llmService.prompt, isNot(contains('<conversation_history>')));
       expect(history.messages, hasLength(2));
       useCase.clearHistory();
       expect(history.messages, isEmpty);
@@ -765,11 +761,11 @@ User: How can I fix it?''');
             isLatestTurn: true,
           )
           .last;
-      expect(fallback.status, QuestionAnswerStatus.answered);
+      expect(fallback.status, QuestionAnswerStatus.noRelevantKnowledge);
       expect(fallback.documents, isEmpty);
       expect(history.messages.map((message) => message.text), [
         question,
-        'Original',
+        fallback.answer,
       ]);
 
       repository.results = [_networkResult];
@@ -791,13 +787,13 @@ User: How can I fix it?''');
       expect(failure.status, QuestionAnswerStatus.modelUnavailable);
       expect(history.messages.map((message) => message.text), [
         question,
-        'Original',
+        fallback.answer,
       ]);
     },
   );
 
   test(
-    'successful regeneration after a stored fallback replaces the turn',
+    'successful regeneration replaces a stored insufficient-knowledge turn',
     () async {
       final history = InMemoryConversationHistory();
       final repository = _FakeRagRepository(const []);
@@ -808,7 +804,7 @@ User: How can I fix it?''');
       );
       const question = 'How do I fix E123?';
       final fallback = await useCase.stream(question, turnId: 'answer').last;
-      expect(fallback.status, QuestionAnswerStatus.answered);
+      expect(fallback.status, QuestionAnswerStatus.noRelevantKnowledge);
       expect(fallback.documents, isEmpty);
       expect(history.messages, hasLength(2));
       repository.results = [_networkResult];

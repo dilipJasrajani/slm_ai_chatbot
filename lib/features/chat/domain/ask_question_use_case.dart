@@ -134,7 +134,8 @@ class AskQuestionUseCase {
       lastAnswer = answer;
       yield answer;
     }
-    if (lastAnswer?.status == QuestionAnswerStatus.answered) {
+    if (lastAnswer?.status == QuestionAnswerStatus.answered ||
+        lastAnswer?.status == QuestionAnswerStatus.noRelevantKnowledge) {
       if (turnIndex >= 0) {
         _conversationHistory.replaceTurn(turnId!, lastAnswer!.answer);
       } else if (!regenerate || isLatestTurn) {
@@ -151,9 +152,6 @@ class AskQuestionUseCase {
           ),
         ]);
       }
-    } else if (turnIndex >= 0 &&
-        lastAnswer?.status == QuestionAnswerStatus.noRelevantKnowledge) {
-      _conversationHistory.replaceTurn(turnId!, null);
     }
   }
 
@@ -182,16 +180,27 @@ class AskQuestionUseCase {
   ) async* {
     final profile = AiLatencyProfile.current;
     profile?.mark(AiProfileEvent.retrievalQueryStart);
-    final retrievalQuery =
-        (_retrievalQueryBuilder ?? const RetrievalQueryBuilder()).build(
-          question: question,
-          history: history,
-        );
+    final resolved = (_retrievalQueryBuilder ?? const RetrievalQueryBuilder())
+        .resolve(question: question, history: history);
+    _debugLog('currentQuestion=${_diagnosticText(question)}');
+    _debugLog(
+      'resolvedQuestion=${_diagnosticText(resolved.question)} '
+      'targetCodes=${resolved.identifiers} '
+      'clarificationRequired=${resolved.clarification != null}',
+    );
     profile?.mark(AiProfileEvent.retrievalQueryEnd);
+    if (resolved.clarification case final String clarification) {
+      yield QuestionAnswer(
+        status: QuestionAnswerStatus.noRelevantKnowledge,
+        answer: clarification,
+      );
+      return;
+    }
+    final retrievalQuery = resolved.question;
     profile?.mark(AiProfileEvent.searchStart);
     final searchResults = await _retrieveKnowledge(
       retrievalQuery,
-      exactMatchQuery: question,
+      exactMatchQuery: retrievalQuery,
     );
     profile?.mark(AiProfileEvent.searchEnd);
     if (searchResults == null) {
@@ -206,20 +215,49 @@ class AskQuestionUseCase {
     }
 
     if (profile != null) profile.retrievedCount = searchResults.length;
+    for (final result in searchResults) {
+      _debugLog(
+        'retrieved ${_documentDiagnostic(result.document)} '
+        'similarity=${result.similarity}',
+      );
+    }
     profile?.mark(AiProfileEvent.groundingStart);
     final groundedDocuments = _relevance.relevantDocuments(
       question: retrievalQuery,
-      identifierQuestion: question,
+      identifierQuestion: retrievalQuery,
       results: searchResults,
     );
-    final documents = _selectEvidence(groundedDocuments, question);
+    final documents = _selectEvidence(groundedDocuments, retrievalQuery);
     profile?.mark(AiProfileEvent.groundingEnd);
     if (profile != null) profile.groundedCount = documents.length;
     _debugLog('retrievedCount=${searchResults.length}');
     _debugLog('groundedCount=${documents.length}');
+    for (final document in documents) {
+      _debugLog('selected ${_documentDiagnostic(document)}');
+    }
+    final availableIdentifiers = documents
+        .expand(_identifierNormalizer.documentIdentifiers)
+        .toSet();
+    final missingIdentifiers = resolved.identifiers.difference(
+      availableIdentifiers,
+    );
+    if (missingIdentifiers.isNotEmpty) {
+      _debugLog('missingCodes=$missingIdentifiers FINAL GENERATION: false');
+      yield QuestionAnswer(
+        status: QuestionAnswerStatus.noRelevantKnowledge,
+        answer:
+            'The local knowledge base has no matching record for '
+            '${missingIdentifiers.join(', ')}. Please check the fault code.',
+      );
+      return;
+    }
     if (documents.isEmpty) {
       _debugLog('FALLBACK:\ntrue');
-      yield* _handleChatRequest(question, history, onGenerationComplete);
+      // Only the conversational fallback needs conversational (not factual) history.
+      _debugLog(
+        'generationHistoryIncluded=${history.isNotEmpty} fallback=true',
+      );
+      yield* _handleChatRequest(retrievalQuery, history, onGenerationComplete);
       return;
     }
 
@@ -229,12 +267,16 @@ class AskQuestionUseCase {
     if (profile != null) profile.retrievedContextCharacters = context.length;
     profile?.mark(AiProfileEvent.promptBuildStart);
     final prompt = _promptBuilder.build(
-      question: question,
+      question: retrievalQuery,
       context: context,
-      history: history,
     );
+    _debugLog('generationHistoryIncluded=false');
     profile?.mark(AiProfileEvent.promptBuildEnd);
-    if (profile != null) profile.ragPromptCharacters = prompt.length;
+    if (profile != null) {
+      profile.ragPromptCharacters = prompt.length;
+      profile.historyMessageCount = 0;
+      profile.historyCharacters = 0;
+    }
     _debugLog('FALLBACK:\nfalse');
     yield* _generateResponse(prompt, documents, onGenerationComplete);
   }
@@ -243,30 +285,26 @@ class AskQuestionUseCase {
     List<KnowledgeDocument> documents,
     String question,
   ) {
-    final identifiers = _identifierNormalizer.extract(question);
-    final exact = <KnowledgeDocument>[];
-    final supporting = <KnowledgeDocument>[];
-    for (final document in documents) {
-      final documentIdentifiers = {
-        ..._identifierNormalizer.extract(document.id),
-        if (document.metadata['code'] case final String code)
-          ..._identifierNormalizer.extract(code),
-      };
-      if (identifiers.any(documentIdentifiers.contains)) {
-        exact.add(document);
-      } else if (supporting.length < _maxSupportingDocuments) {
-        supporting.add(document);
-      }
+    final identifiers = _identifierNormalizer.extractFaultCodes(question);
+    if (identifiers.isEmpty) {
+      return documents.take(_maxSupportingDocuments).toList(growable: false);
     }
-    return [
-      ...exact,
-      ...supporting.take(
-        (_maxSupportingDocuments - exact.length).clamp(
-          0,
-          _maxSupportingDocuments,
-        ),
-      ),
-    ];
+    return documents
+        .where((document) {
+          final codes = _identifierNormalizer.documentIdentifiers(document);
+          return codes.any(identifiers.contains) &&
+              codes.every(identifiers.contains);
+        })
+        .toList(growable: false);
+  }
+
+  String _documentDiagnostic(KnowledgeDocument document) =>
+      'id=${document.id} '
+      'codes=${_identifierNormalizer.documentIdentifiers(document)}';
+
+  String _diagnosticText(String text) {
+    final singleLine = text.replaceAll(RegExp(r'\s+'), ' ');
+    return singleLine.substring(0, singleLine.length.clamp(0, 200));
   }
 
   void _debugLog(String message) {

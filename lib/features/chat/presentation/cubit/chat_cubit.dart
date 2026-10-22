@@ -220,6 +220,7 @@ class ChatCubit extends Cubit<ChatState> {
           text: answer.answer,
           isStreaming: true,
           isError: isError,
+          sources: answer.documents,
         );
         if (answer.answer.trim().isNotEmpty) {
           profile?.mark(AiProfileEvent.firstPresentationText);
@@ -242,10 +243,7 @@ class ChatCubit extends Cubit<ChatState> {
           _replaceMessage(
             assistantId,
             isStreaming: false,
-            sources:
-                completed && lastAnswer?.status == QuestionAnswerStatus.answered
-                ? lastAnswer!.documents
-                : const [],
+            sources: completed ? lastAnswer?.documents ?? const [] : const [],
             generationDuration:
                 completed && lastAnswer?.status == QuestionAnswerStatus.answered
                 ? generationDuration

@@ -417,11 +417,6 @@ class _AiChatPageState extends State<AiChatPage> {
                     ? ChatWelcome(
                         configuration: widget.configuration,
                         theme: chatTheme,
-                        enabled: interactionEnabled,
-                        onSuggestion: (value) {
-                          _composerController.text = value;
-                          _send();
-                        },
                       )
                     : ListView.builder(
                         controller: _scrollController,
@@ -448,6 +443,13 @@ class _AiChatPageState extends State<AiChatPage> {
                     controller: _composerController,
                     enabled: interactionEnabled,
                     onSend: _send,
+                    suggestions: state.messages.isEmpty
+                        ? widget.configuration.suggestions
+                        : const [],
+                    onSuggestion: (value) {
+                      _composerController.text = value;
+                      _send();
+                    },
                     theme: chatTheme,
                     modelLabel: widget.configuration.showModelLabel
                         ? widget.configuration.modelLabel

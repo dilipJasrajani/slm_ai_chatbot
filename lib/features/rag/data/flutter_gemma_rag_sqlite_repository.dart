@@ -137,11 +137,7 @@ class FlutterGemmaRagSqliteRepository implements RagRepository {
   }
 
   void _indexIdentifiers(KnowledgeDocument document) {
-    final identifiers = {
-      ..._identifierNormalizer.extract(document.id),
-      if (document.metadata['code'] case final String code)
-        ..._identifierNormalizer.extract(code),
-    };
+    final identifiers = _identifierNormalizer.documentIdentifiers(document);
     for (final identifier in identifiers) {
       (_documentsByIdentifier[identifier] ??= {})[document.id] = document;
     }

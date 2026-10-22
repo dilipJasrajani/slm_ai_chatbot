@@ -48,18 +48,18 @@ class RetrievedKnowledgeRelevance {
     required Iterable<RagSearchResult> results,
   }) {
     final questionTokens = _meaningfulTokens(question);
-    final questionIdentifiers = _identifierNormalizer.extract(
+    final questionIdentifiers = _identifierNormalizer.extractFaultCodes(
       identifierQuestion ?? question,
     );
     return results
         .where(
-          (result) =>
-              _sharedTokenCount(
-                    questionTokens,
-                    _documentTokens(result.document),
-                  ) >=
-                  2 ||
-              _sharesIdentifier(questionIdentifiers, result.document),
+          (result) => questionIdentifiers.isNotEmpty
+              ? _sharesIdentifier(questionIdentifiers, result.document)
+              : _sharedTokenCount(
+                      questionTokens,
+                      _documentTokens(result.document),
+                    ) >=
+                    2,
         )
         .map((result) => result.document)
         .toList(growable: false);
@@ -112,9 +112,8 @@ class RetrievedKnowledgeRelevance {
     KnowledgeDocument document,
   ) {
     if (questionIdentifiers.isEmpty) return false;
-    final documentIdentifiers = _identifierNormalizer.extract(
-      '${document.id} ${document.title} ${document.content} '
-      '${document.metadata.values.join(' ')}',
+    final documentIdentifiers = _identifierNormalizer.documentIdentifiers(
+      document,
     );
     return questionIdentifiers.any(documentIdentifiers.contains);
   }

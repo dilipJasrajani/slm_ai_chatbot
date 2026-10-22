@@ -26,9 +26,9 @@ class AiAvatar extends StatelessWidget {
       image: true,
       child: CircleAvatar(
         radius: radius,
-        backgroundColor: theme.primaryColor,
+        backgroundColor: theme.accentColor,
         foregroundImage: assistantAvatar,
-        child: Icon(theme.avatarIcon, color: theme.primaryTextColor),
+        child: Icon(theme.avatarIcon, color: theme.primaryColor),
       ),
     );
   }
