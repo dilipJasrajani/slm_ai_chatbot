@@ -25,10 +25,12 @@ class AiAvatar extends StatelessWidget {
           : '$assistantName avatar',
       image: true,
       child: CircleAvatar(
-        radius: radius,
+        radius: 72,
         backgroundColor: theme.accentColor,
         foregroundImage: assistantAvatar,
-        child: Icon(theme.avatarIcon, color: theme.primaryColor),
+        child: assistantAvatar == null
+            ? Icon(theme.avatarIcon, color: theme.primaryColor)
+            : null,
       ),
     );
   }

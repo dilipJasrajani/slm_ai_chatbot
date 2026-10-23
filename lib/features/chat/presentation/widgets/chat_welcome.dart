@@ -35,7 +35,7 @@ class ChatWelcome extends StatelessWidget {
                 Text(
                   configuration.assistantName,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                     color: theme.backgroundTextColor,
                   ),
                 ),
@@ -45,7 +45,7 @@ class ChatWelcome extends StatelessWidget {
                 Text(
                   configuration.welcomeTitle,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: theme.backgroundTextColor,
                   ),
                 ),
@@ -55,7 +55,7 @@ class ChatWelcome extends StatelessWidget {
                 Text(
                   configuration.welcomeMessage,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: theme.backgroundTextColor,
                   ),
                 ),

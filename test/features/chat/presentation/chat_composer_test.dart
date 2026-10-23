@@ -42,6 +42,14 @@ void main() {
       expect(find.text('Suggestions'), findsNothing);
       final panel = find.byKey(const ValueKey('chat-input-panel'));
       expect(
+        find.descendant(of: panel, matching: find.byType(SendButton)),
+        findsNothing,
+      );
+      expect(
+        tester.getRect(find.byType(SendButton)).left,
+        greaterThan(tester.getRect(panel).right),
+      );
+      expect(
         find.descendant(of: panel, matching: find.byType(ActionChip)),
         findsNothing,
       );
@@ -59,27 +67,33 @@ void main() {
       );
       final first = tester.getRect(find.byType(ActionChip).first);
       final second = tester.getRect(find.byType(ActionChip).at(1));
-      expect(first.right, closeTo(tester.getRect(panel).right, 1));
+      expect(
+        first.right,
+        closeTo(tester.getRect(find.byType(SendButton)).right, 1),
+      );
       expect(second.right, closeTo(first.right, 1));
       expect(second.top, greaterThan(first.bottom));
+      final decoration = tester.widget<TextField>(panel).decoration!;
+      expect(decoration.labelText, 'Ask a question');
+      expect(decoration.hintText, isNull);
       expect(
-        find.descendant(of: panel, matching: find.byType(TextField)),
-        findsOneWidget,
-      );
-      final decoration =
-          tester.widget<Container>(panel).decoration! as BoxDecoration;
-      expect(decoration.border, isNotNull);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).decoration?.border,
-        InputBorder.none,
+        decoration.enabledBorder,
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(const AiChatTheme().bubbleRadius),
+          borderSide: BorderSide(color: const AiChatTheme().borderColor),
+        ),
       );
       await tester.tap(find.byType(TextField));
       await tester.pumpAndSettle();
-      final focusedDecoration =
-          tester.widget<Container>(panel).decoration! as BoxDecoration;
       expect(
-        focusedDecoration.border,
-        Border.all(color: const AiChatTheme().buttonColor, width: 2),
+        tester.widget<TextField>(panel).decoration!.focusedBorder,
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(const AiChatTheme().bubbleRadius),
+          borderSide: BorderSide(
+            color: const AiChatTheme().buttonColor,
+            width: 2,
+          ),
+        ),
       );
       expect(
         tester.getBottomLeft(find.byType(ActionChip).first).dy,

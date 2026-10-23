@@ -67,6 +67,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/icons/dumbledore-48.png
     - assets/knowledge_base/
     - assets/evaluation/chat_intent_cases.json
     - assets/evaluation/retrieval_cases.json

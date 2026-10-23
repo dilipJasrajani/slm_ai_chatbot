@@ -37,68 +37,48 @@ class ChatComposer extends StatelessWidget {
             _buildSuggestions(context),
             SizedBox(height: theme.spacing * .75),
           ],
-          Focus(
-            child: Builder(
-              builder: (context) {
-                final focused = Focus.of(context).hasFocus;
-                return Container(
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
                   key: const ValueKey('chat-input-panel'),
-                  padding: EdgeInsets.all(theme.spacing * .75),
-                  decoration: BoxDecoration(
-                    color: theme.inputBackgroundColor,
-                    borderRadius: BorderRadius.circular(theme.bubbleRadius),
-                    border: Border.all(
-                      color: focused ? theme.buttonColor : theme.borderColor,
-                      width: focused ? 2 : 1,
+                  controller: controller,
+                  enabled: enabled,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: theme.inputTextColor),
+                  cursorColor: theme.buttonColor,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => onSend(),
+                  decoration: InputDecoration(
+                    labelText: 'Ask a question',
+                    labelStyle: TextStyle(color: theme.secondaryTextColor),
+                    floatingLabelStyle: TextStyle(color: theme.buttonColor),
+                    filled: true,
+                    fillColor: theme.inputBackgroundColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
+                      borderSide: BorderSide(color: theme.borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
+                      borderSide: BorderSide(color: theme.borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(theme.bubbleRadius),
+                      borderSide: BorderSide(
+                        color: theme.buttonColor,
+                        width: 2,
+                      ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: controller,
-                              enabled: enabled,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: theme.inputTextColor),
-                              cursorColor: theme.buttonColor,
-                              minLines: 1,
-                              maxLines: 4,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => onSend(),
-                              decoration: InputDecoration(
-                                labelText: 'Ask a question',
-                                labelStyle: TextStyle(
-                                  color: theme.secondaryTextColor,
-                                ),
-                                floatingLabelStyle: TextStyle(
-                                  color: theme.buttonColor,
-                                ),
-                                filled: true,
-                                fillColor: theme.inputBackgroundColor,
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SendButton(
-                            enabled: enabled,
-                            onPressed: onSend,
-                            theme: theme,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SendButton(enabled: enabled, onPressed: onSend, theme: theme),
+            ],
           ),
           if (modelLabel != null)
             Padding(
@@ -140,9 +120,9 @@ class ChatComposer extends StatelessWidget {
                     child: ActionChip(
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(16),
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                          bottomLeft: Radius.circular(12),
                           bottomRight: Radius.circular(4),
                         ),
                       ),

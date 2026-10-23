@@ -377,28 +377,28 @@ class _AiChatPageState extends State<AiChatPage> {
                   : _cubit.clearHistory,
               icon: const Icon(Icons.delete_outline),
             ),
-            if (kDebugMode && widget.chatIntentEvaluationRunner != null)
-              IconButton(
-                tooltip: 'Run routing evaluation',
-                onPressed:
-                    state.modelState.status != ModelStatus.ready ||
-                        state.isTyping ||
-                        _isRunningEvaluation
-                    ? null
-                    : _runRoutingEvaluation,
-                icon: const Icon(Icons.alt_route),
-              ),
-            if (kDebugMode && widget.retrievalEvaluationRunner != null)
-              IconButton(
-                tooltip: 'Run retrieval evaluation',
-                onPressed:
-                    state.modelState.status != ModelStatus.ready ||
-                        state.isTyping ||
-                        _isRunningEvaluation
-                    ? null
-                    : _runEvaluation,
-                icon: const Icon(Icons.analytics_outlined),
-              ),
+            // if (kDebugMode && widget.chatIntentEvaluationRunner != null)
+            //   IconButton(
+            //     tooltip: 'Run routing evaluation',
+            //     onPressed:
+            //         state.modelState.status != ModelStatus.ready ||
+            //             state.isTyping ||
+            //             _isRunningEvaluation
+            //         ? null
+            //         : _runRoutingEvaluation,
+            //     icon: const Icon(Icons.alt_route),
+            //   ),
+            // if (kDebugMode && widget.retrievalEvaluationRunner != null)
+            //   IconButton(
+            //     tooltip: 'Run retrieval evaluation',
+            //     onPressed:
+            //         state.modelState.status != ModelStatus.ready ||
+            //             state.isTyping ||
+            //             _isRunningEvaluation
+            //         ? null
+            //         : _runEvaluation,
+            //     icon: const Icon(Icons.analytics_outlined),
+            //   ),
           ],
         ),
         body: SafeArea(

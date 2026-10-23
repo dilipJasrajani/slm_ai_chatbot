@@ -118,8 +118,8 @@ class AiChatConfiguration {
   const AiChatConfiguration({
     this.title = 'ViSage AI',
     this.assistantName = 'ViSage AI',
-    this.assistantAvatar,
-    this.welcomeTitle = 'How can I help?',
+    this.assistantAvatar = const AssetImage('assets/icons/dumbledore-48.png'),
+    this.welcomeTitle = '',
     this.welcomeMessage = 'Ask a question using your local knowledge base.',
     this.greetingMessage = 'Hi! How can I help you today?',
     this.wellbeingMessage =
