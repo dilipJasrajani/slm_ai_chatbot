@@ -655,6 +655,13 @@ void main() {
       expect(llmService.prompt, contains('<knowledge>'));
       expect(llmService.prompt, isNot(contains('<conversation_history>')));
       expect(history.messages, hasLength(2));
+      await useCase('Tell me more.');
+      expect(llmService.prompt, contains('<conversation_history>'));
+      expect(llmService.prompt, contains('Assistant: Check Wi-Fi.'));
+      expect(
+        llmService.prompt,
+        contains('<current_user_question>\nTell me more.'),
+      );
       useCase.clearHistory();
       expect(history.messages, isEmpty);
     },
@@ -945,6 +952,7 @@ class _RecordingPromptBuilder extends RagPromptBuilder {
   String build({
     required String question,
     required String context,
+    String? userQuestion,
     List<ConversationMessage> history = const [],
   }) {
     this.question = question;

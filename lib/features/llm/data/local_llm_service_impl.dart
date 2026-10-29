@@ -32,7 +32,7 @@ class LocalLlmServiceImpl implements LocalLlmService {
       profile.backend = model.activeBackend?.name.toUpperCase() ?? 'UNKNOWN';
     }
     final session = await model.createSession(
-      temperature: 0.8,
+      temperature: 0.2,
       topK: 3,
       topP: 0.95,
       enableThinking: true,
@@ -40,12 +40,7 @@ class LocalLlmServiceImpl implements LocalLlmService {
     _activeSession = session;
 
     try {
-      await session.addQueryChunk(
-        Message(
-          text: prompt,
-          isUser: true,
-        ),
-      );
+      await session.addQueryChunk(Message(text: prompt, isUser: true));
       final rawOutput = _logRawOutput(
         session.getResponseAsync(),
         profile: profile,

@@ -34,7 +34,7 @@ void main() {
 
   for (final (first, second) in [(clock, vent), (vent, clock)]) {
     test(
-      '${first.id} followed by ${second.id} isolates query and prompt',
+      '${first.id} followed by ${second.id} isolates evidence from history',
       () async {
         final rag = _Rag([clock, vent]);
         final llm = _Llm();
@@ -55,11 +55,18 @@ void main() {
         expect(result.documents.map((doc) => doc.id), [second.id]);
         expect(llm.prompt, contains(second.content));
         expect(llm.prompt, isNot(contains(first.content)));
-        expect(llm.prompt, isNot(contains(first.metadata['code'])));
-        expect(llm.prompt, isNot(contains(earlierAnswer)));
-        expect(llm.prompt, isNot(contains('<conversation_history>')));
-        expect(profile.historyMessageCount, 0);
-        expect(profile.historyCharacters, 0);
+        final knowledge = llm.prompt!
+            .split('<knowledge>\n')
+            .last
+            .split('</knowledge>')
+            .first;
+        expect(knowledge, isNot(contains(first.metadata['code'])));
+        expect(knowledge, isNot(contains(earlierAnswer)));
+        expect(llm.prompt, contains(earlierAnswer));
+        expect(llm.prompt, contains('<conversation_history>'));
+        expect(llm.prompt, contains('ignore unrelated history'));
+        expect(profile.historyMessageCount, 4);
+        expect(profile.historyCharacters, greaterThan(0));
       },
     );
   }
@@ -186,7 +193,9 @@ void main() {
         'Subject: Why does the heat pump switch off during venting?',
       );
       expect(llm.prompt, contains(rag.query!));
-      expect(llm.prompt, isNot(contains(llm.answer)));
+      expect(llm.prompt, contains(llm.answer));
+      expect(llm.prompt, contains('<current_user_question>\nTell me more.'));
+      expect(llm.prompt, contains('History is conversational context only'));
       expect(result.documents.single.id, vent.id);
     },
   );

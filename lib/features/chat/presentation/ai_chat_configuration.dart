@@ -129,7 +129,7 @@ class AiChatConfiguration {
         "I'm an AI assistant designed to help with technical information "
         "available in my knowledge base. I can't answer that question.",
     this.suggestions = const [
-      'What does error F.425 mean?',
+      'What does error F.867 mean?',
       'How do I troubleshoot a Communication error PlusBus?',
     ],
     this.showLocalSources = false,

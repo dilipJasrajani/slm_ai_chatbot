@@ -253,7 +253,6 @@ class AskQuestionUseCase {
     }
     if (documents.isEmpty) {
       _debugLog('FALLBACK:\ntrue');
-      // Only the conversational fallback needs conversational (not factual) history.
       _debugLog(
         'generationHistoryIncluded=${history.isNotEmpty} fallback=true',
       );
@@ -269,13 +268,13 @@ class AskQuestionUseCase {
     final prompt = _promptBuilder.build(
       question: retrievalQuery,
       context: context,
+      userQuestion: question,
+      history: history,
     );
-    _debugLog('generationHistoryIncluded=false');
+    _debugLog('generationHistoryIncluded=${history.isNotEmpty}');
     profile?.mark(AiProfileEvent.promptBuildEnd);
     if (profile != null) {
       profile.ragPromptCharacters = prompt.length;
-      profile.historyMessageCount = 0;
-      profile.historyCharacters = 0;
     }
     _debugLog('FALLBACK:\nfalse');
     yield* _generateResponse(prompt, documents, onGenerationComplete);

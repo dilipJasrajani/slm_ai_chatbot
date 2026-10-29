@@ -33,6 +33,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Offline Assistant',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AiChatTheme.brandColor)
