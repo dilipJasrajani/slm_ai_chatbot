@@ -50,7 +50,11 @@ class LocalModelRepositoryImpl implements LocalModelRepository {
     if (_configuration.bundledAsset) {
       return installer.fromAsset(_configuration.source);
     }
-    return installer.fromNetwork(_configuration.source, token: _downloadToken);
+    return installer.fromNetwork(
+      _configuration.source,
+      token: _downloadToken,
+      foreground: true,
+    );
   }
 
   Future<void> releaseLoadedModel() async {

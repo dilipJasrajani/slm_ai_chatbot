@@ -85,6 +85,21 @@ The RAG embedding model is still downloaded separately on first use unless
 already installed; bundling Gemma alone does not make a fresh RAG installation
 entirely offline.
 
+### Android model downloads
+
+Network installations (inference, embedding model, and tokenizer) request a
+foreground download with a progress notification. Allow notifications when
+Android asks: the installed downloader needs this permission to start its
+foreground service on Android 13+. If permission is denied, the download can
+still start but may be interrupted when the app is backgrounded.
+
+The downloader reconnects to an existing task for the same destination instead
+of starting another app-level download. Foreground mode improves background
+survival; it does not guarantee uninterrupted transfers or bypass Android's
+execution limits. Hugging Face transfers do not support resume in the installed
+downloader, so interruptions can restart progress from zero. Model installation
+requires connectivity once; chat and retrieval remain offline after installation.
+
 ## Retrieval evaluation
 
 In debug builds, **Run Retrieval Evaluation (Debug)** indexes the bundled

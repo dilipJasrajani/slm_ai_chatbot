@@ -130,13 +130,19 @@ class ChatComposer extends StatelessWidget {
                         horizontal: 8,
                         vertical: 8,
                       ),
-                      label: Text(
-                        suggestions[index],
+                      label: DefaultTextStyle(
+                        style:
+                            Theme.of(context).textTheme.labelLarge ??
+                            const TextStyle(),
                         softWrap: true,
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: enabled
-                              ? theme.userTextColor
-                              : theme.userTextColor.withValues(alpha: .6),
+                        child: Text(
+                          suggestions[index],
+                          softWrap: true,
+                          style: TextStyle(
+                            color: enabled
+                                ? theme.userTextColor
+                                : theme.userTextColor.withValues(alpha: .6),
+                          ),
                         ),
                       ),
                       tooltip: suggestions[index],

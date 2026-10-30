@@ -129,9 +129,10 @@ class AiChatConfiguration {
         "I'm an AI assistant designed to help with technical information "
         "available in my knowledge base. I can't answer that question.",
     this.suggestions = const [
-      'What does error F.867 mean?',
-      'How do I troubleshoot a Communication error PlusBus?',
-    ],
+      'What does fault F.867 mean, and what causes, system effects, safety warnings, and corrective actions are documented?',
+      'How do I troubleshoot a PlusBus communication error?',
+      'System is showing F.100 error code',
+  ],
     this.showLocalSources = false,
     this.sourceSectionLabel = 'Sources',
     this.modelLabel = 'Qwen3 0.6B \u00B7 Local',

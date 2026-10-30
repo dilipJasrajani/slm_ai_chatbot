@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/ai_chat_configuration.dart';
 import 'package:slm_ai_chatbot/features/chat/presentation/widgets/chat_composer.dart';
@@ -64,6 +65,20 @@ void main() {
       expect(
         tester.widget<Text>(find.text(suggestions.first)).softWrap,
         isTrue,
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.text(suggestions.first),
+      );
+      expect(paragraph.maxLines, isNull);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        paragraph
+            .getOffsetForCaret(
+              TextPosition(offset: suggestions.first.length),
+              Rect.zero,
+            )
+            .dy,
+        greaterThan(0),
       );
       final first = tester.getRect(find.byType(ActionChip).first);
       final second = tester.getRect(find.byType(ActionChip).at(1));

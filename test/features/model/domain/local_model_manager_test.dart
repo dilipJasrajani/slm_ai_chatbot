@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_manager.dart';
 import 'package:slm_ai_chatbot/features/model/domain/local_model_repository.dart';
@@ -54,6 +56,34 @@ void main() {
     await manager.dispose();
   });
 
+  test('concurrent readiness calls share one download and load', () async {
+    final gate = Completer<void>();
+    final repository = _FakeLocalModelRepository(
+      installed: false,
+      downloadGate: gate,
+    );
+    final manager = LocalModelManager(repository);
+
+    final first = manager.ensureReady();
+    final second = manager.ensureReady();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(identical(first, second), isTrue);
+    expect(repository.downloadCalls, 1);
+    expect(repository.loadCalls, 0);
+
+    gate.complete();
+    final results = await Future.wait([first, second]);
+    expect(
+      results.map((result) => result.status),
+      everyElement(ModelStatus.ready),
+    );
+    expect(repository.downloadCalls, 1);
+    expect(repository.loadCalls, 1);
+
+    await manager.dispose();
+  });
+
   test('reports an error and does not load when downloading fails', () async {
     final repository = _FakeLocalModelRepository(
       installed: false,
@@ -76,11 +106,13 @@ class _FakeLocalModelRepository implements LocalModelRepository {
     required this.installed,
     void Function(void Function(int progress) onProgress)? onDownload,
     this.downloadError,
+    this.downloadGate,
   }) : _onDownload = onDownload;
 
   final bool installed;
   final void Function(void Function(int progress) onProgress)? _onDownload;
   final Object? downloadError;
+  final Completer<void>? downloadGate;
   int downloadCalls = 0;
   int loadCalls = 0;
 
@@ -93,6 +125,7 @@ class _FakeLocalModelRepository implements LocalModelRepository {
       throw downloadError!;
     }
     _onDownload?.call(onProgress);
+    await downloadGate?.future;
   }
 
   @override

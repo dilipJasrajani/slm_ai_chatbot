@@ -24,10 +24,23 @@ class FlutterGemmaEmbeddingModelInitializer {
 
   Future<void> _ensureReady() async {
     if (!FlutterEdgeAi.hasActiveEmbedder()) {
-      await FlutterEdgeAi.installEmbedder()
-          .modelFromNetwork(_modelUrl, token: _downloadToken)
-          .tokenizerFromNetwork(_tokenizerUrl, token: _downloadToken)
-          .install();
+      // The embedding builder in flutter_edge_ai 2.4.1 cannot set foreground.
+      // The spec API preserves installation identities and activates the model.
+      await FlutterEdgeAiPlugin.instance.modelManager.ensureModelReadyFromSpec(
+        EmbeddingModelSpec(
+          name: 'embeddinggemma-300M_seq256_mixed-precision',
+          modelSource: ModelSource.network(
+            _modelUrl,
+            authToken: _downloadToken,
+            foreground: true,
+          ),
+          tokenizerSource: ModelSource.network(
+            _tokenizerUrl,
+            authToken: _downloadToken,
+            foreground: true,
+          ),
+        ),
+      );
     }
 
     if (FlutterEdgeAiPlugin.instance.initializedEmbeddingModel == null) {
